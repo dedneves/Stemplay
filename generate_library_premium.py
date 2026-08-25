@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-StemPlay Library Premium v2
-- Interface mobile-first refinada
-- Botão Download + Acessar Online
-- Busca, filtros, favoritos, dark/light mode
-- PWA support
+StemPlay Library Premium v3
+- Interface refinada (glassmorphism + gradientes)
+- Botoes Online + Download em cada card
+- Busca, filtros, favoritos, dark/light, bottom nav mobile
 """
 
 import re, json
 from pathlib import Path
 from collections import defaultdict
-from urllib.parse import quote
 
 READER_BASE = "https://reader.stemplay.io/?file="
 USER_ID = "k3s"
@@ -83,7 +81,7 @@ def main():
                for n, it in sorted(courses_dict.items())]
 
     courses_json = json.dumps(courses, ensure_ascii=False)
-    print("🎨 Gerando biblioteca premium v2...")
+    print("🎨 Gerando biblioteca premium v3...")
 
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -92,13 +90,12 @@ def main():
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0a1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>StemPlay Library</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}}
-:root{{--bg:#0a0a1a;--bg2:#12122a;--bg3:#1a1a3e;--accent:#6c5ce7;--accent2:#a29bfe;--glow:rgba(108,92,231,.25);--txt:#f0f0ff;--txt2:#8888aa;--card:#16163a;--border:#2a2a5e;--ok:#00cec9;--warn:#fdcb6e;--danger:#ff7675;--radius:14px}}
-html[data-theme="light"]{{--bg:#f4f6fb;--bg2:#fff;--bg3:#e8ecf5;--accent:#6c5ce7;--accent2:#5a4bd1;--glow:rgba(108,92,231,.15);--txt:#1a1a2e;--txt2:#666;--card:#fff;--border:#dde1ea}}
+:root{{--bg:#0a0a1a;--bg2:#12122a;--bg3:#1a1a3e;--accent:#6c5ce7;--accent2:#a29bfe;--glow:rgba(108,92,231,.25);--txt:#f0f0ff;--txt2:#8888aa;--card:rgba(26,26,62,.6);--border:#2a2a5e;--ok:#00cec9;--warn:#fdcb6e;--danger:#ff7675;--radius:16px}}
+html[data-theme="light"]{{--bg:#f4f6fb;--bg2:#ffffff;--bg3:#e8ecf5;--accent:#6c5ce7;--accent2:#5a4bd1;--glow:rgba(108,92,231,.15);--txt:#1a1a2e;--txt2:#666;--card:rgba(255,255,255,.8);--border:#dde1ea}}
 body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding-bottom:75px;transition:background .3s,color .3s}}
 .header{{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}}
 .header-top{{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem}}
@@ -129,7 +126,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 @keyframes fadeIn{{from{{opacity:0;transform:translateY(-8px)}}to{{opacity:1;transform:translateY(0)}}}}
 .gtitle{{color:var(--accent2);font-size:.8rem;font-weight:700;margin:.85rem 0 .5rem;text-transform:uppercase;letter-spacing:.5px}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.6rem}}
-.card{{background:var(--card);border-radius:var(--radius);padding:1rem;text-decoration:none;color:var(--txt);border:1.5px solid var(--border);display:flex;flex-direction:column;gap:.6rem;transition:transform .15s,border-color .2s,box-shadow .2s;position:relative;overflow:hidden}}
+.card{{background:var(--card);backdrop-filter:blur(10px);border-radius:var(--radius);padding:1rem;text-decoration:none;color:var(--txt);border:1.5px solid var(--border);display:flex;flex-direction:column;gap:.6rem;transition:transform .15s,border-color .2s,box-shadow .2s;position:relative;overflow:hidden}}
 .card::before{{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}}
 .card.teacher::before{{background:linear-gradient(90deg,var(--warn),#e17055)}}
 .card.workbook::before{{background:linear-gradient(90deg,var(--ok),#55efc4)}}
@@ -144,7 +141,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 .b-workbook{{background:var(--ok);color:#1a1a2e}}
 .b-student,.b-standard{{background:var(--accent);color:#fff}}
 .card-actions{{display:flex;gap:.4rem;margin-top:.25rem}}
-.abtn{{flex:1;padding:.55rem;border:none;border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.3rem;transition:all .15s}}
+.abtn{{flex:1;padding:.55rem;border:none;border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.3rem;transition:all .15s;color:inherit}}
 .abtn:active{{transform:scale(.95)}}
 .btn-online{{background:var(--accent);color:#fff}}
 .btn-dl{{background:var(--bg3);color:var(--txt);border:1.5px solid var(--border)}}
@@ -197,7 +194,24 @@ const D={courses_json};
 let cF='all',cS='',cV='home';
 let favs=JSON.parse(localStorage.getItem('sp_favs')||'[]');
 const $=id=>document.getElementById(id);
+const $$=(s,p)=>(p||document).querySelectorAll(s);
 function toast(m){{const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}}
+async function downloadPDF(url,name){{
+  try{{
+    toast('⬇️ Baixando...');
+    const r=await fetch(url);
+    if(!r.ok)throw 0;
+    const b=await r.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download=name+'.pdf';
+    document.body.appendChild(a);a.click();a.remove();
+    toast('✅ Download iniciado!');
+  }}catch(e){{
+    window.open(url,'_blank');
+    toast('📄 Aberto em nova aba');
+  }}
+}}
 function render(){{
   const app=$('app');app.innerHTML='';let vc=0;const sl=cS.toLowerCase();
   D.forEach(c=>{{
@@ -220,13 +234,12 @@ function render(){{
         const ic=i.material_type==='Teacher'?'👨‍🏫':i.material_type==='Workbook'?'📝':i.material_type==='Student'?'🎓':'📖';
         const bc='b-'+i.material_type.toLowerCase();
         const isF=favs.includes(i.url);
-        const eu=encodeURIComponent(i.url);
-        const onlineUrl='https://reader.stemplay.io/?file='+eu+'&userId=k3s';
-        const dlUrl=i.url;
+        const onlineUrl='https://reader.stemplay.io/?file='+encodeURIComponent(i.url)+'&userId=k3s';
         let badges=`<span class="badge ${{bc}}">${{i.material_type}}</span>`;
         if(i.module_num)badges+=`<span class="badge" style="background:#8b5cf6;color:#fff">M${{i.module_num}}</span>`;
         if(i.unit_num)badges+=`<span class="badge" style="background:#ec4899;color:#fff">U${{i.unit_num}}</span>`;
-        a.innerHTML=`<div class="card-top"><div class="card-icon">${{ic}}</div><div class="card-info"><div class="card-name">${{i.display_name}}</div><div class="card-badges">${{badges}}</div></div></div><div class="card-actions"><a href="${{onlineUrl}}" target="_blank" rel="noopener" class="abtn btn-online">🌐 Online</a><a href="${{dlUrl}}" download class="abtn btn-dl">⬇️ Download</a><button class="abtn btn-fav${{isF?' is-fav':''}}" data-url="${{i.url}}">${{isF?'★':'☆'}}</button></div>`;
+        a.innerHTML=`<div class="card-top"><div class="card-icon">${{ic}}</div><div class="card-info"><div class="card-name">${{i.display_name}}</div><div class="card-badges">${{badges}}</div></div></div><div class="card-actions"><a href="${{onlineUrl}}" target="_blank" rel="noopener" class="abtn btn-online">🌐 Online</a><button class="abtn btn-dl" data-url="${{i.url}}" data-name="${{i.display_name}}">⬇️ Download</button><button class="abtn btn-fav${{isF?' is-fav':''}}" data-url="${{i.url}}">${{isF?'★':'☆'}}</button></div>`;
+        a.querySelector('.btn-dl').onclick=e=>{{e.stopPropagation();downloadPDF(i.url,i.display_name)}};
         a.querySelector('.btn-fav').onclick=e=>{{e.stopPropagation();toggleFav(i.url)}};
         gr.appendChild(a);
       }});
@@ -245,10 +258,9 @@ let st;
 $('searchBox').oninput=e=>{{clearTimeout(st);st=setTimeout(()=>{{cS=e.target.value;render()}},180)}};
 $('filterBar').onclick=e=>{{const b=e.target.closest('.fbtn');if(!b)return;$$('.fbtn').forEach(x=>x.classList.remove('active'));b.classList.add('active');cF=b.dataset.t;render()}};
 $$('.nitem').forEach(b=>b.onclick=function(){{if(this.dataset.a==='top'){{window.scrollTo({{top:0,behavior:'smooth'}});return}}$$('.nitem').forEach(x=>x.classList.remove('active'));this.classList.add('active');cV=this.dataset.a;render()}});
-function $$(s,p){{return(p||document).querySelectorAll(s)}}
 document.documentElement.setAttribute('data-theme',localStorage.getItem('sp_theme')||'dark');
 render();
-console.log('📚 StemPlay Library v2 |',D.reduce((s,c)=>s+c.items.length,0),'materiais em',D.length,'cursos');
+console.log('📚 StemPlay Library v3 |',D.reduce((s,c)=>s+c.items.length,0),'materiais em',D.length,'cursos');
 </script>
 </body>
 </html>"""
@@ -258,7 +270,7 @@ console.log('📚 StemPlay Library v2 |',D.reduce((s,c)=>s+c.items.length,0),'ma
 
     print(f"✅ Biblioteca gerada: {output_html}")
     print(f"📊 {len(courses)} cursos | {len(pdfs)} materiais")
-    print(f"🎯 Features: Download ⬇️ | Online 🌐 | Favoritos ⭐ | Dark/Light 🌓 | Busca 🔍 | Filtros | PWA 📲")
+    print("🎯 Features: Download ⬇️ | Online 🌐 | Favoritos ⭐ | Dark/Light 🌓 | Busca 🔍 | Filtros | Mobile 📱")
 
 if __name__ == "__main__":
     main()
