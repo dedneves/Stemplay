@@ -20,10 +20,30 @@ if errorlevel 1 (
     exit /b 1
 )
 echo   [OK] Python detectado
+python --version
 
-:: Instala dependencias
+:: Instala dependencias com python -m pip (GARANTE o Python certo)
+echo.
 echo   [1/3] Instalando dependencias...
-pip install aiohttp tqdm qrcode >nul 2>&1
+python -m pip install --upgrade pip >nul 2>&1
+python -m pip install aiohttp tqdm qrcode
+if errorlevel 1 (
+    echo.
+    echo   [ERRO] Falha ao instalar dependencias!
+    echo   Tente manualmente: python -m pip install aiohttp tqdm qrcode
+    pause
+    exit /b 1
+)
+
+:: Verifica se instalou de verdade
+python -c "import aiohttp" >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo   [ERRO] aiohttp nao instalou corretamente!
+    echo   Tente: python -m pip install aiohttp
+    pause
+    exit /b 1
+)
 echo   [OK] Dependencias prontas
 
 :: Gera lista de PDFs se nao existir
@@ -59,7 +79,6 @@ echo      Tudo pronto! Iniciando servidores...
 echo   ==============================================
 echo.
 
-:: Chama o launcher (2 servidores + QR Code)
 python launcher.py
 
 pause
