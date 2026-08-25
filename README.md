@@ -42,4 +42,4 @@ bash
 # Linux
 hostname -I
 # Windows (PowerShell)
-(Get-NetIPAddress -AddressFamily IPv4 | Where-Object
+(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike "127.*"} | Select-Object -First 1).IPAddress
