@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-StemPlay Library Premium v7
-Com animações suaves no site
+AQUI E A PARTE DE GERAÇAO DO SITE FALOU                                                                                                                                                                  TA OLHANDO O QUE AQUI.
 """
 import re, json, sys
 from pathlib import Path
