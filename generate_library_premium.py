@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-StemPlay Library Premium v5
-- Thumbnails nos cards (quando disponiveis)
-- Placeholders elegantes com gradientes
+StemPlay Library Premium v7
+Com animações suaves no site
 """
-import re, json, sys, os, hashlib
+import re, json, sys
 from pathlib import Path
 from collections import defaultdict
 
@@ -16,7 +15,6 @@ if sys.platform == 'win32':
 
 READER_BASE = "https://reader.stemplay.io/?file="
 USER_ID = "k3s"
-THUMBS_DIR = "thumbnails"
 
 def parse_pdf_info(url):
     filename = url.split("/")[-1].replace(".pdf", "")
@@ -63,15 +61,6 @@ def parse_pdf_info(url):
         "sort_key": sort_key, "group_name": group_name
     }
 
-def has_thumb(url):
-    """Verifica se existe thumbnail pro PDF"""
-    h = hashlib.md5(url.encode()).hexdigest()
-    return os.path.exists(os.path.join(THUMBS_DIR, f"{h}.jpg"))
-
-def thumb_path(url):
-    h = hashlib.md5(url.encode()).hexdigest()
-    return f"thumbnails/{h}.jpg"
-
 def main():
     input_file = "pdfs_found.txt"
     output_html = "stemplay_library.html"
@@ -87,9 +76,6 @@ def main():
     print(f"  [INFO] Parseando {len(urls)} arquivos...")
     pdfs = [parse_pdf_info(url) for url in urls]
 
-    thumbs_count = sum(1 for p in pdfs if has_thumb(p['url']))
-    print(f"  [INFO] Thumbnails disponiveis: {thumbs_count}/{len(pdfs)}")
-
     courses_dict = defaultdict(list)
     for pdf in pdfs:
         courses_dict[pdf['course']].append(pdf)
@@ -98,14 +84,6 @@ def main():
                for n, it in sorted(courses_dict.items())]
 
     courses_json = json.dumps(courses, ensure_ascii=False)
-
-    # Mapeia URL -> thumb path
-    thumb_map = {}
-    for pdf in pdfs:
-        if has_thumb(pdf['url']):
-            thumb_map[pdf['url']] = thumb_path(pdf['url'])
-    thumbs_json = json.dumps(thumb_map, ensure_ascii=False)
-
     print("  [INFO] Gerando biblioteca HTML...")
 
     html = f"""<!DOCTYPE html>
@@ -119,73 +97,91 @@ def main():
 *{{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}}
 :root{{--bg:#0a0a1a;--bg2:#12122a;--bg3:#1a1a3e;--accent:#6c5ce7;--accent2:#a29bfe;--glow:rgba(108,92,231,.25);--txt:#f0f0ff;--txt2:#8888aa;--card:rgba(26,26,62,.6);--border:#2a2a5e;--ok:#00cec9;--warn:#fdcb6e;--radius:16px}}
 html[data-theme="light"]{{--bg:#f4f6fb;--bg2:#fff;--bg3:#e8ecf5;--accent:#6c5ce7;--accent2:#5a4bd1;--glow:rgba(108,92,231,.15);--txt:#1a1a2e;--txt2:#666;--card:rgba(255,255,255,.8);--border:#dde1ea}}
-body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding-bottom:75px;transition:background .3s,color .3s}}
-.header{{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);z-index:100;backdrop-filter:blur(20px)}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding-bottom:75px;transition:background .3s,color .3s;overflow-x:hidden}}
+
+/* Animacao de entrada */
+@keyframes fadeInUp{{from{{opacity:0;transform:translateY(20px)}}to{{opacity:1;transform:translateY(0)}}}}
+@keyframes slideInLeft{{from{{opacity:0;transform:translateX(-20px)}}to{{opacity:1;transform:translateX(0)}}}}
+@keyframes pulse{{0%,100%{{transform:scale(1)}}50%{{transform:scale(1.05)}}}}
+@keyframes shimmer{{0%{{background-position:-200% 0}}100%{{background-position:200% 0}}}}
+@keyframes glow{{0%,100%{{box-shadow:0 0 5px var(--glow)}}50%{{box-shadow:0 0 20px var(--glow),0 0 30px var(--glow)}}}}
+
+.header{{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);z-index:100;backdrop-filter:blur(20px);animation:fadeInUp .5s ease}}
 .header-top{{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem}}
-.logo{{font-size:1.4rem;font-weight:900;background:linear-gradient(135deg,var(--accent),#fd79a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.5px}}
-.theme-btn{{width:42px;height:42px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);color:var(--txt);cursor:pointer;font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:transform .2s}}
+.logo{{font-size:1.4rem;font-weight:900;background:linear-gradient(135deg,var(--accent),#fd79a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.5px;animation:pulse 3s ease-in-out infinite}}
+.theme-btn{{width:42px;height:42px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);color:var(--txt);cursor:pointer;font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .3s ease}}
+.theme-btn:hover{{transform:rotate(180deg) scale(1.1);border-color:var(--accent)}}
 .theme-btn:active{{transform:scale(.85)}}
 .stats-row{{display:flex;gap:.5rem;padding:0 1.25rem .75rem;overflow-x:auto;scrollbar-width:none}}
 .stats-row::-webkit-scrollbar{{display:none}}
-.chip{{background:var(--bg3);padding:.35rem .85rem;border-radius:20px;font-size:.75rem;white-space:nowrap;border:1px solid var(--border);flex-shrink:0}}
+.chip{{background:var(--bg3);padding:.35rem .85rem;border-radius:20px;font-size:.75rem;white-space:nowrap;border:1px solid var(--border);flex-shrink:0;animation:fadeInUp .5s ease backwards;transition:all .3s ease}}
+.chip:nth-child(1){{animation-delay:.1s}}
+.chip:nth-child(2){{animation-delay:.2s}}
+.chip:nth-child(3){{animation-delay:.3s}}
+.chip:hover{{transform:translateY(-2px);border-color:var(--accent)}}
 .chip b{{color:var(--accent2);margin-right:.25rem}}
-.search-wrap{{padding:0 1.25rem .75rem}}
-.search{{width:100%;padding:.9rem 1.1rem;background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius);color:var(--txt);font-size:1rem;transition:border .2s,box-shadow .2s}}
-.search:focus{{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}}
-.filters{{display:flex;gap:.4rem;padding:0 1.25rem 1rem;overflow-x:auto;scrollbar-width:none}}
+.search-wrap{{padding:0 1.25rem .75rem;animation:fadeInUp .5s ease .2s backwards}}
+.search{{width:100%;padding:.9rem 1.1rem;background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius);color:var(--txt);font-size:1rem;transition:all .3s ease}}
+.search:focus{{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow);animation:glow 2s ease-in-out infinite}}
+.filters{{display:flex;gap:.4rem;padding:0 1.25rem 1rem;overflow-x:auto;scrollbar-width:none;animation:fadeInUp .5s ease .3s backwards}}
 .filters::-webkit-scrollbar{{display:none}}
-.fbtn{{padding:.45rem 1rem;background:var(--bg3);border:1.5px solid var(--border);border-radius:20px;color:var(--txt2);cursor:pointer;font-weight:600;font-size:.8rem;white-space:nowrap;transition:all .2s;flex-shrink:0}}
-.fbtn.active{{background:var(--accent);border-color:var(--accent);color:#fff}}
+.fbtn{{padding:.45rem 1rem;background:var(--bg3);border:1.5px solid var(--border);border-radius:20px;color:var(--txt2);cursor:pointer;font-weight:600;font-size:.8rem;white-space:nowrap;transition:all .3s cubic-bezier(.4,0,.2,1);flex-shrink:0}}
+.fbtn:hover{{transform:translateY(-2px);border-color:var(--accent)}}
+.fbtn.active{{background:var(--accent);border-color:var(--accent);color:#fff;animation:pulse .3s ease}}
 .main{{padding:0 .75rem;max-width:1400px;margin:0 auto}}
-.course{{background:var(--bg2);border-radius:var(--radius);margin-bottom:.75rem;border:1px solid var(--border);overflow:hidden}}
-.chdr{{padding:1rem 1.25rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;transition:background .15s}}
-.chdr:active{{background:var(--bg3)}}
+.course{{background:var(--bg2);border-radius:var(--radius);margin-bottom:.75rem;border:1px solid var(--border);overflow:hidden;animation:fadeInUp .5s ease backwards;transition:all .3s ease}}
+.course:hover{{border-color:var(--accent);box-shadow:0 4px 20px var(--glow)}}
+.chdr{{padding:1rem 1.25rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;transition:background .3s ease}}
+.chdr:hover{{background:var(--bg3)}}
+.chdr:active{{background:var(--bg3);transform:scale(.99)}}
 .ctitle{{font-size:1rem;font-weight:700;flex:1;margin-right:.5rem;line-height:1.3}}
-.ccount{{background:var(--accent);color:#fff;padding:.2rem .65rem;border-radius:12px;font-size:.7rem;font-weight:800;flex-shrink:0}}
-.carrow{{color:var(--txt2);transition:transform .3s;font-size:1rem;margin-left:.5rem}}
+.ccount{{background:var(--accent);color:#fff;padding:.2rem .65rem;border-radius:12px;font-size:.7rem;font-weight:800;flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
+.carrow{{color:var(--txt2);transition:transform .4s cubic-bezier(.4,0,.2,1);font-size:1rem;margin-left:.5rem}}
 .course.open .carrow{{transform:rotate(180deg)}}
-.cbody{{display:none;padding:0 1.25rem 1.25rem;animation:fadeIn .25s ease}}
+.cbody{{display:none;padding:0 1.25rem 1.25rem;animation:fadeInUp .4s ease}}
 .course.open .cbody{{display:block}}
-@keyframes fadeIn{{from{{opacity:0;transform:translateY(-8px)}}to{{opacity:1;transform:translateY(0)}}}}
-.gtitle{{color:var(--accent2);font-size:.8rem;font-weight:700;margin:.85rem 0 .5rem;text-transform:uppercase;letter-spacing:.5px}}
+.gtitle{{color:var(--accent2);font-size:.8rem;font-weight:700;margin:.85rem 0 .5rem;text-transform:uppercase;letter-spacing:.5px;animation:slideInLeft .4s ease}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.7rem}}
-.card{{background:var(--card);backdrop-filter:blur(10px);border-radius:var(--radius);color:var(--txt);border:1.5px solid var(--border);display:flex;flex-direction:column;transition:transform .15s,border-color .2s,box-shadow .2s;overflow:hidden}}
+.card{{background:var(--card);backdrop-filter:blur(10px);border-radius:var(--radius);color:var(--txt);border:1.5px solid var(--border);display:flex;flex-direction:column;overflow:hidden;animation:fadeInUp .5s ease backwards;transition:all .3s cubic-bezier(.4,0,.2,1)}}
+.card:hover{{transform:translateY(-4px) scale(1.02);border-color:var(--accent);box-shadow:0 8px 30px var(--glow)}}
 .card:active{{transform:scale(.97)}}
-.card:hover{{border-color:var(--accent);box-shadow:0 8px 25px var(--glow)}}
-
-/* Thumbnail area */
 .thumb-wrap{{position:relative;width:100%;aspect-ratio:3/4;background:var(--bg3);overflow:hidden;border-bottom:1px solid var(--border)}}
-.thumb-wrap img{{width:100%;height:100%;object-fit:cover;display:block}}
-
-/* Placeholder quando nao tem thumb */
-.placeholder{{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;position:relative;overflow:hidden}}
-.placeholder::before{{content:'';position:absolute;inset:0;opacity:.15;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.4),transparent 50%)}}
-.ph-letter{{font-size:4rem;font-weight:900;color:rgba(255,255,255,.9);text-shadow:0 2px 20px rgba(0,0,0,.3);letter-spacing:-2px;z-index:1}}
+.placeholder{{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;position:relative;overflow:hidden;transition:all .3s ease}}
+.card:hover .placeholder{{transform:scale(1.05)}}
+.placeholder::before{{content:'';position:absolute;inset:0;opacity:.15;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.4),transparent 50%);animation:shimmer 3s linear infinite;background-size:200% 200%}}
+.ph-letter{{font-size:4rem;font-weight:900;color:rgba(255,255,255,.9);text-shadow:0 2px 20px rgba(0,0,0,.3);letter-spacing:-2px;z-index:1;transition:all .3s ease}}
+.card:hover .ph-letter{{transform:scale(1.1) rotate(-5deg)}}
 .ph-type{{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.85);padding:.25rem .6rem;border-radius:10px;background:rgba(0,0,0,.25);backdrop-filter:blur(10px);z-index:1}}
 .ph-course{{position:absolute;bottom:.5rem;left:.5rem;right:.5rem;font-size:.65rem;color:rgba(255,255,255,.8);font-weight:600;text-align:center;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.5);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-
 .card-body{{padding:.85rem 1rem;display:flex;flex-direction:column;gap:.5rem;flex:1}}
 .card-name{{font-weight:700;font-size:.9rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .card-badges{{display:flex;gap:.3rem;flex-wrap:wrap}}
-.badge{{padding:.15rem .55rem;border-radius:10px;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px}}
+.badge{{padding:.15rem .55rem;border-radius:10px;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px;transition:all .2s ease}}
+.badge:hover{{transform:scale(1.1)}}
 .b-teacher{{background:var(--warn);color:#1a1a2e}}
 .b-workbook{{background:var(--ok);color:#1a1a2e}}
 .b-student,.b-standard{{background:var(--accent);color:#fff}}
 .card-actions{{display:flex;gap:.35rem;margin-top:auto}}
-.abtn{{flex:1;padding:.55rem;border:none;border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.3rem;transition:all .15s;color:inherit}}
+.abtn{{flex:1;padding:.55rem;border:none;border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:.3rem;transition:all .2s cubic-bezier(.4,0,.2,1);color:inherit;position:relative;overflow:hidden}}
+.abtn::after{{content:'';position:absolute;inset:0;background:linear-gradient(45deg,transparent 30%,rgba(255,255,255,.3) 50%,transparent 70%);transform:translateX(-100%);transition:transform .6s ease}}
+.abtn:hover::after{{transform:translateX(100%)}}
 .abtn:active{{transform:scale(.95)}}
 .btn-online{{background:var(--accent);color:#fff}}
+.btn-online:hover{{background:var(--accent2);transform:translateY(-2px)}}
 .btn-dl{{background:var(--bg3);color:var(--txt);border:1.5px solid var(--border)}}
+.btn-dl:hover{{border-color:var(--accent);transform:translateY(-2px)}}
 .btn-fav{{background:none;border:1.5px solid var(--border);color:var(--txt2);width:40px;flex:none;font-size:1.1rem;border-radius:10px}}
-.btn-fav.is-fav{{color:var(--warn);border-color:var(--warn)}}
-.bottom-nav{{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:.4rem 0 calc(.4rem + env(safe-area-inset-bottom));z-index:100;backdrop-filter:blur(20px)}}
-.nitem{{background:none;border:none;color:var(--txt2);padding:.4rem .8rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.15rem;font-size:.65rem;font-weight:600;transition:color .2s}}
+.btn-fav:hover{{border-color:var(--warn);color:var(--warn);transform:scale(1.1)}}
+.btn-fav.is-fav{{color:var(--warn);border-color:var(--warn);animation:pulse .3s ease}}
+.bottom-nav{{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:.4rem 0 calc(.4rem + env(safe-area-inset-bottom));z-index:100;backdrop-filter:blur(20px);animation:fadeInUp .5s ease}}
+.nitem{{background:none;border:none;color:var(--txt2);padding:.4rem .8rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.15rem;font-size:.65rem;font-weight:600;transition:all .3s ease}}
+.nitem:hover{{color:var(--accent);transform:translateY(-2px)}}
 .nitem.active{{color:var(--accent)}}
 .nicon{{font-size:1rem;font-weight:800}}
-.toast{{position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:var(--bg2);color:var(--txt);padding:.7rem 1.3rem;border-radius:25px;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;border:1px solid var(--border);font-size:.85rem;font-weight:600}}
-.toast.show{{opacity:1}}
-.empty{{text-align:center;padding:4rem 1rem;color:var(--txt2)}}
-.empty-icon{{font-size:1.5rem;font-weight:800;margin-bottom:1rem;color:var(--accent2)}}
+.toast{{position:fixed;bottom:85px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--bg2);color:var(--txt);padding:.7rem 1.3rem;border-radius:25px;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:1000;opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1);pointer-events:none;border:1px solid var(--border);font-size:.85rem;font-weight:600}}
+.toast.show{{opacity:1;transform:translateX(-50%) translateY(0)}}
+.empty{{text-align:center;padding:4rem 1rem;color:var(--txt2);animation:fadeInUp .5s ease}}
+.empty-icon{{font-size:1.5rem;font-weight:800;margin-bottom:1rem;color:var(--accent2);animation:pulse 2s ease-in-out infinite}}
 @media(min-width:768px){{body{{padding-bottom:0}}.bottom-nav{{display:none}}.main{{padding:0 2rem}}.grid{{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}}}}
 @media(max-width:480px){{.grid{{grid-template-columns:repeat(2,1fr)}}}}
 </style>
@@ -222,13 +218,11 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 <div class="toast" id="toast"></div>
 <script>
 const D={courses_json};
-const THUMBS={thumbs_json};
 let cF='all',cS='',cV='home';
 let favs=JSON.parse(localStorage.getItem('sp_favs')||'[]');
 const $=id=>document.getElementById(id);
 const $$=(s,p)=>(p||document).querySelectorAll(s);
 
-// Gerador de gradientes baseados em hash do curso
 function hashString(s){{let h=0;for(let i=0;i<s.length;i++)h=((h<<5)-h)+s.charCodeAt(i);return Math.abs(h)}}
 function courseGradient(course){{
   const h=hashString(course);
@@ -258,22 +252,15 @@ async function downloadPDF(url,name){{
   }}
 }}
 
-function renderThumb(item){{
-  if(THUMBS[item.url]){{
-    return `<div class="thumb-wrap"><img src="${{THUMBS[item.url]}}" alt="${{item.display_name}}" loading="lazy" onerror="this.parentElement.innerHTML=renderPlaceholder('${{item.course}}','${{item.material_type}}')"></div>`;
-  }}
-  return renderPlaceholder(item.course, item.material_type);
-}}
-
 function renderPlaceholder(course, type){{
   const letter = course.charAt(0).toUpperCase();
   const bg = courseGradient(course);
-  const icon = type==='Teacher'?'T':type==='Workbook'?'W':type==='Student'?'S':'D';
   return `<div class="thumb-wrap"><div class="placeholder" style="background:${{bg}}"><div class="ph-letter">${{letter}}</div><div class="ph-type">${{type}}</div><div class="ph-course">${{course}}</div></div></div>`;
 }}
 
 function render(){{
   const app=$('app');app.innerHTML='';let vc=0;const sl=cS.toLowerCase();
+  let delay=0;
   D.forEach(c=>{{
     const fi=c.items.filter(i=>{{
       const ms=!sl||i.course.toLowerCase().includes(sl)||i.display_name.toLowerCase().includes(sl)||i.group_name.toLowerCase().includes(sl);
@@ -284,13 +271,15 @@ function render(){{
     if(!fi.length)return;vc+=fi.length;
     const gs={{}};fi.forEach(i=>{{(gs[i.group_name]=gs[i.group_name]||[]).push(i)}});
     const ce=document.createElement('div');ce.className='course';
+    ce.style.animationDelay=`${{delay*0.05}}s`;delay++;
     ce.innerHTML=`<div class="chdr"><div class="ctitle">${{c.name}}</div><div class="ccount">${{fi.length}}</div><div class="carrow">&#9660;</div></div><div class="cbody"></div>`;
     const cb=ce.querySelector('.cbody');
     Object.entries(gs).forEach(([gn,items])=>{{
       const gt=document.createElement('div');gt.className='gtitle';gt.textContent=gn+' · '+items.length+' itens';cb.appendChild(gt);
       const gr=document.createElement('div');gr.className='grid';
-      items.forEach(i=>{{
+      items.forEach((i,idx)=>{{
         const a=document.createElement('div');a.className='card '+i.material_type.toLowerCase();
+        a.style.animationDelay=`${{idx*0.03}}s`;
         const bc='b-'+i.material_type.toLowerCase();
         const isF=favs.includes(i.url);
         const onlineUrl='https://reader.stemplay.io/?file='+encodeURIComponent(i.url)+'&userId=k3s';
@@ -298,7 +287,7 @@ function render(){{
         if(i.module_num)badges+=`<span class="badge" style="background:#8b5cf6;color:#fff">M${{i.module_num}}</span>`;
         if(i.unit_num)badges+=`<span class="badge" style="background:#ec4899;color:#fff">U${{i.unit_num}}</span>`;
 
-        a.innerHTML=`${{renderThumb(i)}}<div class="card-body"><div class="card-name">${{i.display_name}}</div><div class="card-badges">${{badges}}</div><div class="card-actions"><a href="${{onlineUrl}}" target="_blank" rel="noopener" class="abtn btn-online">Online</a><button class="abtn btn-dl">Download</button><button class="abtn btn-fav${{isF?' is-fav':''}}">${{isF?'&#9733;':'&#9734;'}}</button></div></div>`;
+        a.innerHTML=`${{renderPlaceholder(i.course, i.material_type)}}<div class="card-body"><div class="card-name">${{i.display_name}}</div><div class="card-badges">${{badges}}</div><div class="card-actions"><a href="${{onlineUrl}}" target="_blank" rel="noopener" class="abtn btn-online">Online</a><button class="abtn btn-dl">Download</button><button class="abtn btn-fav${{isF?' is-fav':''}}">${{isF?'&#9733;':'&#9734;'}}</button></div></div>`;
 
         a.querySelector('.btn-dl').onclick=e=>{{e.stopPropagation();downloadPDF(i.url,i.display_name)}};
         a.querySelector('.btn-fav').onclick=e=>{{e.stopPropagation();toggleFav(i.url)}};
@@ -336,7 +325,6 @@ render();
 
     print(f"  [OK] Biblioteca gerada: {output_html}")
     print(f"  [INFO] {len(courses)} cursos | {len(pdfs)} materiais")
-    print(f"  [INFO] Com thumbnails: {thumbs_count} | Sem: {len(pdfs) - thumbs_count}")
 
 if __name__ == "__main__":
     main()
