@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-StemPlay Library - Launcher v4
-- Banner DEDNEVES com cores piscantes (4s) e termina verde
-- Verificação de updates do GitHub
-- Portas automáticas (evita WinError 10013)
+StemPlay Library - Launcher 
+
+OPA AQUI E O DEDNEVES SE VOCE ESTA VENDO ESSE CODIGO VOCCE DEVE SER UM CURIOSO NE... nao se PREUCUPE nao a nada aqui!!
 """
-import os, sys, time, socket, subprocess, threading, json
+import os, sys, time, socket, subprocess, threading
 import http.server, socketserver
 from urllib.request import urlopen, Request
 from urllib.error import URLError
+import json
+from datetime import datetime, timedelta
 
 # ANSI no Windows
 if sys.platform == 'win32':
@@ -26,19 +27,20 @@ PDFS = "pdfs_found.txt"
 REPO_API = "https://api.github.com/repos/dedneves/Stemplay/commits?per_page=1"
 SHA_FILE = os.path.join(DIRETORIO, ".last_commit")
 
+# Tempo que considera visitante "ativo" (segundos)
+TEMPO_ATIVO = 60
+
 # Cores ANSI
 CORES = [
-    "\033[91m",  # vermelho claro
-    "\033[92m",  # verde claro
-    "\033[93m",  # amarelo claro
-    "\033[94m",  # azul claro
-    "\033[95m",  # magenta claro
-    "\033[96m",  # ciano claro
-    "\033[97m",  # branco
+    "\033[91m", "\033[92m", "\033[93m", "\033[94m",
+    "\033[95m", "\033[96m", "\033[97m",
 ]
 VERDE = "\033[92m"
+CIANO = "\033[96m"
+AMARELO = "\033[93m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
+DIM = "\033[2m"
 
 # ---- ASCII art DEDNEVES ----
 LETRAS = {
@@ -49,6 +51,36 @@ LETRAS = {
     'S': ["███████╗", "██╔════╝", "███████╗", "╚════██║", "███████║", "╚══════╝"],
     ' ': ["   ", "   ", "   ", "   ", "   ", "   "],
 }
+
+# ---- Rastreador de visitantes ----
+class RastreadorVisitantes:
+    def __init__(self):
+        self.visitantes = {}  # ip -> {'ultimo': datetime, 'requests': int, 'pagina': str}
+        self.lock = threading.Lock()
+        self.total_visitas = 0
+
+    def registrar(self, ip, pagina):
+        with self.lock:
+            agora = datetime.now()
+            if ip not in self.visitantes:
+                self.total_visitas += 1
+            self.visitantes[ip] = {
+                'ultimo': agora,
+                'requests': self.visitantes.get(ip, {}).get('requests', 0) + 1,
+                'pagina': pagina,
+                'primeiro': self.visitantes.get(ip, {}).get('primeiro', agora)
+            }
+
+    def ativos(self):
+        with self.lock:
+            agora = datetime.now()
+            limite = timedelta(seconds=TEMPO_ATIVO)
+            return {
+                ip: dados for ip, dados in self.visitantes.items()
+                if agora - dados['ultimo'] < limite
+            }
+
+rastreador = RastreadorVisitantes()
 
 def ascii_art(texto):
     linhas = [""] * 6
@@ -61,10 +93,10 @@ def limpar():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def banner_piscante():
-    """4 segundos de cores aleatórias e estabiliza em verde"""
+    """2 segundos de cores aleatórias e estabiliza em verde"""
     import random
     art = ascii_art("DEDNEVES")
-    duracao = 4.0
+    duracao = 2.0
     intervalo = 0.08
     frames = int(duracao / intervalo)
 
@@ -72,7 +104,7 @@ def banner_piscante():
     print()
     for i in range(frames):
         cor = random.choice(CORES)
-        print("\033[6A", end="")  # volta 6 linhas
+        print("\033[6A", end="")
         for linha in art:
             print("    " + cor + BOLD + linha + RESET)
         sys.stdout.flush()
@@ -89,7 +121,6 @@ def banner_piscante():
     print()
 
 def banner_estatico():
-    limpar()
     print()
     art = ascii_art("DEDNEVES")
     for linha in art:
@@ -101,10 +132,8 @@ def banner_estatico():
 
 # ---- Verificação de updates do GitHub ----
 def checar_updates():
-    """Verifica se há commits novos no repositório"""
     print("    [CHECK] Verificando atualizacoes do repositorio...")
 
-    # Pega SHA local salvo
     sha_local = None
     if os.path.exists(SHA_FILE):
         try:
@@ -113,7 +142,6 @@ def checar_updates():
         except Exception:
             pass
 
-    # Pega último commit remoto
     try:
         req = Request(REPO_API, headers={"User-Agent": "StemPlay-Launcher"})
         with urlopen(req, timeout=5) as resp:
@@ -124,18 +152,16 @@ def checar_updates():
             sha_remoto = data[0]["sha"]
             mensagem = data[0]["commit"]["message"].split("\n")[0][:60]
             data_commit = data[0]["commit"]["author"]["date"][:10]
-    except (URLError, json.JSONDecodeError, KeyError, OSError) as e:
-        print(f"    [INFO] Sem internet ou repo indisponivel - modo offline")
+    except (URLError, json.JSONDecodeError, KeyError, OSError):
+        print("    [INFO] Sem internet ou repo indisponivel - modo offline")
         return
 
-    # Salva novo SHA
     try:
         with open(SHA_FILE, "w") as f:
             f.write(sha_remoto)
     except Exception:
         pass
 
-    # Compara
     if sha_local is None:
         print(f"    [INFO] Primeira checagem. Commit: {sha_remoto[:8]} ({data_commit})")
         print(f"    [INFO] \"{mensagem}\"")
@@ -156,7 +182,6 @@ def checar_updates():
         print(f"    [ OK ] Versao atualizada (commit {sha_remoto[:8]})")
 
 def baixar_atualizacao():
-    """Baixa os arquivos principais do repositório"""
     print()
     print("    [DL] Baixando arquivos atualizados...")
     arquivos = [
@@ -230,16 +255,27 @@ def encontrar_porta_livre(preferida):
         s2.close()
         return porta
 
-class ServidorHTTP(socketserver.ThreadingTCPServer):
-    allow_reuse_address = True
-
+# ---- Handler HTTP com rastreamento ----
 def criar_handler(diretorio):
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=diretorio, **kwargs)
+
         def log_message(self, *args):
-            pass
+            pass  # suprime logs
+
+        def do_GET(self):
+            # Registra visitante
+            ip = self.client_address[0]
+            pagina = self.path.split('?')[0]
+            rastreador.registrar(ip, pagina)
+
+            # Chama handler original
+            super().do_GET()
     return Handler
+
+class ServidorHTTP(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
 
 def rodar_servidor(porta, event_parar):
     handler = criar_handler(DIRETORIO)
@@ -270,11 +306,55 @@ def mostrar_qr(url):
         print("    [AVISO] Instale 'qrcode':  pip install qrcode")
         print(f"    Ou acesse: {url}")
 
+def mostrar_visitantes():
+    """Exibe lista de visitantes conectados"""
+    ativos = rastreador.ativos()
+
+    print()
+    print("    " + "─" * 44)
+    print(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}")
+    print("    " + "─" * 44)
+
+    if not ativos:
+        print(f"    {DIM}(ninguem conectado no momento){RESET}")
+    else:
+        for ip, dados in sorted(ativos.items(), key=lambda x: x[1]['ultimo'], reverse=True):
+            tempo_atras = int((datetime.now() - dados['ultimo']).total_seconds())
+            if tempo_atras < 5:
+                status = "agora"
+            else:
+                status = f"{tempo_atras}s atras"
+
+            # Identifica se é local ou rede
+            if ip.startswith("127.") or ip == "localhost":
+                origem = "LOCAL"
+            else:
+                origem = "REDE "
+
+            print(f"    {VERDE}●{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}")
+
+    print()
+    print(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
+    print()
+    print("    Pressione Ctrl+C para encerrar.")
+    print()
+
+def atualizar_visitantes_loop(event_parar):
+    """Thread que atualiza a lista de visitantes periodicamente"""
+    while not event_parar.is_set():
+        time.sleep(3)  # Atualiza a cada 3 segundos
+        if not event_parar.is_set():
+            # Move cursor pra cima e redesenha
+            mostrar_visitantes()
+            # Volta cursor pro início da seção
+            sys.stdout.write(f"\033[{10 + len(rastreador.ativos())}A")
+            sys.stdout.flush()
+
 def main():
     os.chdir(DIRETORIO)
     limpar()
 
-    # Verifica updates do GitHub
+    # Verifica updates
     checar_updates()
 
     # Banner piscante
@@ -288,12 +368,6 @@ def main():
             sys.exit(1)
     else:
         print("    [ OK ] Lista de PDFs encontrada")
-
-    # Gera thumbnails se existir o script
-    thumbs_script = os.path.join(DIRETORIO, "generate_thumbnails.py")
-    thumbs_dir = os.path.join(DIRETORIO, "thumbnails")
-    if os.path.exists(thumbs_script) and not os.path.exists(thumbs_dir):
-        rodar_script("generate_thumbnails.py", "Gerando thumbnails (pode demorar)")
 
     # Gera HTML
     if not os.path.exists(HTML):
@@ -322,6 +396,7 @@ def main():
     time.sleep(0.5)
 
     # Limpa e redesenha
+    limpar()
     banner_estatico()
     print("    Servidores no ar!")
     print("    " + "─" * 44)
@@ -337,9 +412,11 @@ def main():
     print("    Escaneie o QR Code com o celular:")
     print()
     mostrar_qr(url_rede)
-    print()
-    print("    Pressione Ctrl+C para encerrar.")
-    print()
+
+    # Mostra visitantes e inicia thread de atualização
+    mostrar_visitantes()
+    t_visitantes = threading.Thread(target=atualizar_visitantes_loop, args=(parar_event,), daemon=True)
+    t_visitantes.start()
 
     try:
         while True:
