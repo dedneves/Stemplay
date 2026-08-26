@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Scanner do bucket S3 StemPlay - descobre todos os PDFs
-Versao limpa: sem emojis, compativel com Windows
+FALA DED AQUI ESSA PARTE E A PARTE MANEIRA!!! SE VOCE QUISER SABER MAIS VA NOS FORUNS AIONHTTP LA TEM VARIAS COISAS MANEIRAS QUE VOCE DEVERIA VER TAMBEM
 """
 import asyncio
 import aiohttp
