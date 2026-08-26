@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 """
-StemPlay Library - Launcher 
-
-OPA AQUI E O DEDNEVES SE VOCE ESTA VENDO ESSE CODIGO VOCCE DEVE SER UM CURIOSO NE... nao se PREUCUPE nao a nada aqui!!
+AQUI E O DED E SO LAUNCHER NAO TEM NADA
 """
-import os, sys, time, socket, subprocess, threading
+import os, sys, time, socket, subprocess, threading, json
+from datetime import datetime, timedelta
 import http.server, socketserver
 from urllib.request import urlopen, Request
 from urllib.error import URLError
-import json
-from datetime import datetime, timedelta
 
-# ANSI no Windows
 if sys.platform == 'win32':
     os.system('')
     try:
@@ -26,15 +22,10 @@ HTML = "stemplay_library.html"
 PDFS = "pdfs_found.txt"
 REPO_API = "https://api.github.com/repos/dedneves/Stemplay/commits?per_page=1"
 SHA_FILE = os.path.join(DIRETORIO, ".last_commit")
-
-# Tempo que considera visitante "ativo" (segundos)
 TEMPO_ATIVO = 60
 
-# Cores ANSI
-CORES = [
-    "\033[91m", "\033[92m", "\033[93m", "\033[94m",
-    "\033[95m", "\033[96m", "\033[97m",
-]
+CORES = ["\033[91m", "\033[92m", "\033[93m", "\033[94m",
+         "\033[95m", "\033[96m", "\033[97m"]
 VERDE = "\033[92m"
 CIANO = "\033[96m"
 AMARELO = "\033[93m"
@@ -42,7 +33,6 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 DIM = "\033[2m"
 
-# ---- ASCII art DEDNEVES ----
 LETRAS = {
     'D': ["██████╗ ", "██╔══██╗", "██║  ██║", "██║  ██║", "██████╔╝", "╚═════╝ "],
     'E': ["███████╗", "██╔════╝", "█████╗  ", "██╔══╝  ", "███████╗", "╚══════╝"],
@@ -52,14 +42,16 @@ LETRAS = {
     ' ': ["   ", "   ", "   ", "   ", "   ", "   "],
 }
 
-# ---- Rastreador de visitantes ----
 class RastreadorVisitantes:
     def __init__(self):
-        self.visitantes = {}  # ip -> {'ultimo': datetime, 'requests': int, 'pagina': str}
+        self.visitantes = {}
         self.lock = threading.Lock()
         self.total_visitas = 0
 
     def registrar(self, ip, pagina):
+        # Ignora requests chatos
+        if pagina in ('/favicon.ico', '/robots.txt'):
+            return
         with self.lock:
             agora = datetime.now()
             if ip not in self.visitantes:
@@ -80,6 +72,9 @@ class RastreadorVisitantes:
                 if agora - dados['ultimo'] < limite
             }
 
+    def contar_ativos(self):
+        return len(self.ativos())
+
 rastreador = RastreadorVisitantes()
 
 def ascii_art(texto):
@@ -93,7 +88,6 @@ def limpar():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def banner_piscante():
-    """2 segundos de cores aleatórias e estabiliza em verde"""
     import random
     art = ascii_art("DEDNEVES")
     duracao = 2.0
@@ -110,7 +104,6 @@ def banner_piscante():
         sys.stdout.flush()
         time.sleep(intervalo)
 
-    # Estabiliza em verde
     print("\033[6A", end="")
     for linha in art:
         print("    " + VERDE + BOLD + linha + RESET)
@@ -130,7 +123,6 @@ def banner_estatico():
     print("    " + "─" * 44)
     print()
 
-# ---- Verificação de updates do GitHub ----
 def checar_updates():
     print("    [CHECK] Verificando atualizacoes do repositorio...")
 
@@ -209,7 +201,6 @@ def baixar_atualizacao():
     input("    Pressione Enter para sair...")
     sys.exit(0)
 
-# ---- Spinner controlado ----
 def spinner(mensagem, parar_event):
     frames = ['|', '/', '-', '\\']
     i = 0
@@ -255,22 +246,18 @@ def encontrar_porta_livre(preferida):
         s2.close()
         return porta
 
-# ---- Handler HTTP com rastreamento ----
 def criar_handler(diretorio):
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=diretorio, **kwargs)
 
         def log_message(self, *args):
-            pass  # suprime logs
+            pass
 
         def do_GET(self):
-            # Registra visitante
             ip = self.client_address[0]
             pagina = self.path.split('?')[0]
             rastreador.registrar(ip, pagina)
-
-            # Chama handler original
             super().do_GET()
     return Handler
 
@@ -306,17 +293,16 @@ def mostrar_qr(url):
         print("    [AVISO] Instale 'qrcode':  pip install qrcode")
         print(f"    Ou acesse: {url}")
 
-def mostrar_visitantes():
-    """Exibe lista de visitantes conectados"""
+def gerar_bloco_visitantes():
+    """Gera linhas da seção de visitantes (sem imprimir ainda)"""
     ativos = rastreador.ativos()
-
-    print()
-    print("    " + "─" * 44)
-    print(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}")
-    print("    " + "─" * 44)
+    linhas = []
+    linhas.append("    " + "─" * 44)
+    linhas.append(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}")
+    linhas.append("    " + "─" * 44)
 
     if not ativos:
-        print(f"    {DIM}(ninguem conectado no momento){RESET}")
+        linhas.append(f"    {DIM}(ninguem conectado no momento){RESET}")
     else:
         for ip, dados in sorted(ativos.items(), key=lambda x: x[1]['ultimo'], reverse=True):
             tempo_atras = int((datetime.now() - dados['ultimo']).total_seconds())
@@ -325,42 +311,50 @@ def mostrar_visitantes():
             else:
                 status = f"{tempo_atras}s atras"
 
-            # Identifica se é local ou rede
             if ip.startswith("127.") or ip == "localhost":
                 origem = "LOCAL"
             else:
                 origem = "REDE "
 
-            print(f"    {VERDE}●{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}")
+            linhas.append(f"    {VERDE}●{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}")
 
-    print()
-    print(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
-    print()
-    print("    Pressione Ctrl+C para encerrar.")
-    print()
+    linhas.append("")
+    linhas.append(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
+    return linhas
 
-def atualizar_visitantes_loop(event_parar):
-    """Thread que atualiza a lista de visitantes periodicamente"""
+def loop_visitantes(event_parar, estado):
+    """Loop que atualiza visitantes usando ANSI 'Erase in Display' corretamente"""
+    ultimo_total_linhas = 0
+
     while not event_parar.is_set():
-        time.sleep(3)  # Atualiza a cada 3 segundos
-        if not event_parar.is_set():
-            # Move cursor pra cima e redesenha
-            mostrar_visitantes()
-            # Volta cursor pro início da seção
-            sys.stdout.write(f"\033[{10 + len(rastreador.ativos())}A")
+        time.sleep(3)
+        if event_parar.is_set():
+            break
+
+        # Apaga as linhas antigas: move cursor pra cima e apaga cada linha
+        if ultimo_total_linhas > 0:
+            sys.stdout.write(f"\033[{ultimo_total_linhas}A")  # sobe N linhas
+            sys.stdout.write("\033[J")  # apaga do cursor até o fim da tela
             sys.stdout.flush()
+
+        # Gera e imprime novo bloco
+        linhas = gerar_bloco_visitantes()
+        for linha in linhas:
+            print(linha)
+        print()
+        print("    Pressione Ctrl+C para encerrar.")
+        print()
+
+        # Guarda o total de linhas impressas (incluindo os prints extras)
+        ultimo_total_linhas = len(linhas) + 2  # +2 pelos prints vazios
 
 def main():
     os.chdir(DIRETORIO)
     limpar()
 
-    # Verifica updates
     checar_updates()
-
-    # Banner piscante
     banner_piscante()
 
-    # Gera PDFs
     if not os.path.exists(PDFS):
         print("    Primeira execucao: gerando lista de PDFs...")
         if not rodar_script("s3_god_mode.py", "Gerando lista de PDFs"):
@@ -369,7 +363,6 @@ def main():
     else:
         print("    [ OK ] Lista de PDFs encontrada")
 
-    # Gera HTML
     if not os.path.exists(HTML):
         if not rodar_script("generate_library_premium.py", "Gerando biblioteca HTML"):
             input("\n    Pressione Enter para sair...")
@@ -395,7 +388,6 @@ def main():
     t_rede.start()
     time.sleep(0.5)
 
-    # Limpa e redesenha
     limpar()
     banner_estatico()
     print("    Servidores no ar!")
@@ -412,10 +404,17 @@ def main():
     print("    Escaneie o QR Code com o celular:")
     print()
     mostrar_qr(url_rede)
+    print()
 
-    # Mostra visitantes e inicia thread de atualização
-    mostrar_visitantes()
-    t_visitantes = threading.Thread(target=atualizar_visitantes_loop, args=(parar_event,), daemon=True)
+    # Imprime bloco inicial de visitantes
+    for linha in gerar_bloco_visitantes():
+        print(linha)
+    print()
+    print("    Pressione Ctrl+C para encerrar.")
+    print()
+
+    # Inicia thread de atualização
+    t_visitantes = threading.Thread(target=loop_visitantes, args=(parar_event, None), daemon=True)
     t_visitantes.start()
 
     try:
