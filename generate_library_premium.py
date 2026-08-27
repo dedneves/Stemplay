@@ -16,44 +16,42 @@ READER_BASE = "https://reader.stemplay.io/?file="
 USER_ID = "k3s"
 
 def parse_pdf_info(url):
-    """Parse melhorado com extracao inteligente de nomes"""
+    """Parse definitivo - extrai o que importa, ignora o resto"""
     filename = url.split("/")[-1].replace(".pdf", "")
     parts = url.split("/")
     
-    # Extrai nome do curso (remove sufixos)
+    # Nome do curso da URL
     course_raw = parts[4] if len(parts) > 4 else "OUTROS"
     course_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', course_raw, flags=re.IGNORECASE)
     course = course_clean.replace("-", " ").replace("_", " ").title()
     
-    # Detecta tipo de material
-    filename_upper = filename.upper()
-    is_teacher = "TEACHER" in filename_upper or course_raw.upper().endswith("TEACHER")
-    is_student = "STUDENT" in filename_upper or "STUDENT-BOOK" in filename_upper
-    is_workbook = "WORKBOOK" in filename_upper or "WORK-BOOK" in filename_upper
+    # Tipo de material
+    fn_up = filename.upper()
+    is_teacher = "TEACHER" in fn_up or course_raw.upper().endswith("TEACHER")
+    is_student = "STUDENT" in fn_up and not is_teacher
+    is_workbook = "WORKBOOK" in fn_up
     
-    if is_teacher:
-        material_type = "Teacher"
-    elif is_workbook:
-        material_type = "Workbook"
-    elif is_student:
-        material_type = "Student"
-    else:
-        material_type = "Standard"
+    material_type = "Teacher" if is_teacher else ("Workbook" if is_workbook else ("Student" if is_student else "Standard"))
     
-    # Extrai numeros
-    lesson_match = re.search(r'(?:Aula|Lesson|Class)(\d+)', filename, re.IGNORECASE)
-    unit_match = re.search(r'Unit(\d+)', filename)
-    module_match = re.search(r'M(\d+)', filename)
-    checkpoint_match = re.search(r'Checkpoint(\d+)', filename, re.IGNORECASE)
+    # ==========================================
+    # EXTRAI NUMEROS E IDENTIFICADORES
+    # ==========================================
+    lesson_m = re.search(r'(?:Aula|Lesson|Class)(\d+)', filename, re.IGNORECASE)
+    unit_m = re.search(r'Unit(\d+)', filename, re.IGNORECASE)
+    module_m = re.search(r'M(\d+)', filename)
+    checkpoint_m = re.search(r'Checkpoint(\d+)', filename, re.IGNORECASE)
     
-    lesson_num = int(lesson_match.group(1)) if lesson_match else None
-    unit_num = int(unit_match.group(1)) if unit_match else None
-    module_num = int(module_match.group(1)) if module_match else None
-    checkpoint_num = int(checkpoint_match.group(1)) if checkpoint_match else None
+    lesson_num = int(lesson_m.group(1)) if lesson_m else None
+    unit_num = int(unit_m.group(1)) if unit_m else None
+    module_num = int(module_m.group(1)) if module_m else None
+    checkpoint_num = int(checkpoint_m.group(1)) if checkpoint_m else None
     
-    # Nome de exibicao INTELIGENTE
+    # ==========================================
+    # DISPLAY NAME - Logica nova: extrai o que importa
+    # ==========================================
     display_name = None
     
+    # Prioridade 1: padroes com numero
     if lesson_num:
         display_name = f"Aula {lesson_num:02d}"
     elif unit_num:
@@ -62,41 +60,110 @@ def parse_pdf_info(url):
         display_name = f"Modulo {module_num}"
     elif checkpoint_num:
         display_name = f"Checkpoint {checkpoint_num:02d}"
-    else:
-        # Extrai nome especifico do arquivo
-        # Remove prefixos comuns e sufixos
-        name_clean = filename
-        
-        # Remove padroes comuns
-        patterns_to_remove = [
-            r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]',  # Remove tudo antes de STUDENT BOOK/TEACHER BOOK
-            r'[-_](TEACHER|STUDENT|WORKBOOK)$',  # Remove sufixos
-            r'^[A-Z0-9-]+[-_]',  # Remove prefixo do curso
+    
+    # Prioridade 2: palavras-chave especiais (sem numero)
+    if not display_name:
+        keywords = [
+            (r'Grammar\s*Reference', 'Grammar Reference'),
+            (r'Checkpoint\s*Key', 'Checkpoint Key'),
+            (r'Answer\s*Key', 'Answer Key'),
+            (r'Audio\s*Scripts?', 'Audio Script'),
+            (r'Extra\s*Resources?', 'Extra Resources'),
+            (r'Workbook\s*Answer\s*Key', 'Workbook Answer Key'),
+            (r'Consolidation.*Key', 'Consolidation Key'),
+            (r'Workbook(?!Answer)', 'Workbook'),
+            (r'Unit\s*00', 'Unit 00'),
+            (r'Teacher\s*Book', 'Teacher Book'),
+            (r'Student\s*Book', 'Student Book'),
         ]
         
-        for pattern in patterns_to_remove:
-            name_clean = re.sub(pattern, '', name_clean, flags=re.IGNORECASE)
-        
-        # Remove numeros iniciais (Unit00, etc)
-        name_clean = re.sub(r'^(Unit|Module|Mod)\d+[-_]?', '', name_clean, flags=re.IGNORECASE)
-        
-        # Se ficou vazio ou muito curto, usa o filename original limpo
-        if not name_clean or len(name_clean) < 3:
-            name_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', filename, flags=re.IGNORECASE)
-            name_clean = re.sub(r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]', '', name_clean, flags=re.IGNORECASE)
-        
-        # Formata bonito
-        display_name = name_clean.replace("_", " ").replace("-", " ").title()
-        
-        # Casos especiais
-        if "GrammarReference" in filename or "Grammar Reference" in display_name:
-            display_name = "Grammar Reference"
-        elif "CheckpointKey" in filename or "Checkpoint Key" in display_name:
-            display_name = "Checkpoint Key"
-        elif "AnswerKey" in filename or "Answer Key" in display_name:
-            display_name = "Answer Key"
+        for pattern, name in keywords:
+            if re.search(pattern, filename, re.IGNORECASE):
+                display_name = name
+                break
     
-    # Grupo e ordenacao
+    # Prioridade 3: extrai o ultimo segmento significativo
+    if not display_name:
+        # Divide por hifen/underscore e pega segmentos uteis
+        segments = re.split(r'[-_]', filename)
+        
+        # Remove segmentos inuteis
+        useless = {'ENGLISH', 'TEEN1', 'TEEN2', 'TEEN3', 'JUNIOR', 'PLENO',
+                   'STUDENT', 'TEACHER', 'BOOK', 'WORKBOOK', 'COM', 'DE',
+                   'AO', 'LV1', 'LV2', 'I', 'II', 'III', 'INICIANTE'}
+        
+        meaningful = [s for s in segments if s.upper() not in useless and len(s) > 2]
+        
+        if meaningful:
+            display_name = " ".join(meaningful).title()
+        else:
+            display_name = filename.replace("_", " ").replace("-", " ").title()
+    
+    # ==========================================
+    # GRUPO E ORDENACAO
+    # ==========================================
+    if checkpoint_num:
+        sort_key = (0, 0, checkpoint_num)
+        group_name = "Checkpoints"
+    elif module_num and lesson_num:
+        sort_key = (module_num, lesson_num, 0)
+        group_name = f"Modulo {module_num}"
+    elif unit_num:
+        sort_key = (unit_num, 0, 0)
+        group_name = "Unidades"
+    else:
+        sort_key = (0, 0, 0)
+        group_name = "Geral"
+    
+    return {
+        "url": url,
+        "course": course,
+        "course_raw": course_raw,
+        "display_name": display_name,
+        "material_type": material_type,
+        "lesson_num": lesson_num,
+        "unit_num": unit_num,
+        "module_num": module_num,
+        "checkpoint_num": checkpoint_num,
+        "sort_key": sort_key,
+        "group_name": group_name
+    }
+        
+        filename_lower = filename.lower()
+        for key, value in special_names.items():
+            if key in filename_lower:
+                display_name = value
+                break
+        
+        # 3. Se não achou padrão especial, extrai o que sobra
+        if not display_name:
+            # Remove TUDO que é ruído
+            name_clean = filename
+            
+            # Remove nome do curso no início
+            name_clean = re.sub(r'^[A-Z0-9]+[-_]', '', name_clean)
+            
+            # Remove STUDENT BOOK / TEACHER BOOK / WORKBOOK
+            name_clean = re.sub(r'[-_](STUDENT|TEACHER)[-_]?BOOK[-_]', ' ', name_clean, flags=re.IGNORECASE)
+            name_clean = re.sub(r'[-_](STUDENT|TEACHER|WORKBOOK)[-_]', ' ', name_clean, flags=re.IGNORECASE)
+            
+            # Remove sufixos teacher/student/workbook
+            name_clean = re.sub(r'[-_](teacher|student|workbook)$', '', name_clean, flags=re.IGNORECASE)
+            
+            # Remove Unit00, Unit01, etc se não tiver número capturado
+            if not unit_num:
+                name_clean = re.sub(r'Unit\d+', '', name_clean, flags=re.IGNORECASE)
+            
+            # Limpa espaços múltiplos e hífens
+            name_clean = re.sub(r'[-_]+', ' ', name_clean)
+            name_clean = re.sub(r'\s+', ' ', name_clean).strip()
+            
+            # Formata bonito
+            display_name = name_clean.title() if name_clean else filename.replace("_", " ").replace("-", " ").title()
+    
+    # ==========================================
+    # GRUPO E ORDENAÇÃO
+    # ==========================================
     if checkpoint_num:
         sort_key = (0, 0, checkpoint_num)
         group_name = "Checkpoints"
@@ -148,6 +215,32 @@ def main():
             pdfs_unicos.append(pdf)
     
     pdfs = pdfs_unicos
+
+        # ==========================================
+    # DEDUPLICAÇÃO POR CONTEÚDO (não só URL)
+    # ==========================================
+    # Remove duplicatas baseadas em (curso + nome + tipo)
+    # Mantém a primeira ocorrência de cada combinação
+    vistos_por_conteudo = {}
+    pdfs_dedup = []
+    
+    for pdf in pdfs:
+        # Cria chave única baseada no conteúdo
+        chave = (
+            pdf['course'].lower(),
+            pdf['display_name'].lower(),
+            pdf['material_type'].lower(),
+            pdf['group_name'].lower()
+        )
+        
+        if chave not in vistos_por_conteudo:
+            vistos_por_conteudo[chave] = True
+            pdfs_dedup.append(pdf)
+    
+    print(f"  [INFO] Deduplicacao por conteudo: {len(pdfs)} -> {len(pdfs_dedup)} arquivos")
+    pdfs = pdfs_dedup
+
+
     print(f"  [INFO] Apos deduplicacao: {len(pdfs)} arquivos")
     
     # Agrupa por curso
