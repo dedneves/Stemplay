@@ -16,7 +16,7 @@ READER_BASE = "https://reader.stemplay.io/?file="
 USER_ID = "k3s"
 
 def parse_pdf_info(url):
-    """Parse melhorado com extracao inteligente de nomes"""
+    """Parse ultra-agressivo com limpeza completa de nomes"""
     filename = url.split("/")[-1].replace(".pdf", "")
     parts = url.split("/")
     
@@ -51,9 +51,12 @@ def parse_pdf_info(url):
     module_num = int(module_match.group(1)) if module_match else None
     checkpoint_num = int(checkpoint_match.group(1)) if checkpoint_match else None
     
-    # Nome de exibicao INTELIGENTE
+    # ==========================================
+    # EXTRAÇÃO AGRESSIVA DO DISPLAY_NAME
+    # ==========================================
     display_name = None
     
+    # 1. Padrões com número (prioridade máxima)
     if lesson_num:
         display_name = f"Aula {lesson_num:02d}"
     elif unit_num:
@@ -63,40 +66,55 @@ def parse_pdf_info(url):
     elif checkpoint_num:
         display_name = f"Checkpoint {checkpoint_num:02d}"
     else:
-        # Extrai nome especifico do arquivo
-        # Remove prefixos comuns e sufixos
-        name_clean = filename
+        # 2. Casos especiais conhecidos
+        special_names = {
+            'grammarreference': 'Grammar Reference',
+            'checkpointkey': 'Checkpoint Key',
+            'answerkey': 'Answer Key',
+            'audioscript': 'Audio Script',
+            'audioscripts': 'Audio Scripts',
+            'extraresources': 'Extra Resources',
+            'workbookanswerkey': 'Workbook Answer Key',
+            'consolidationwbkey': 'Consolidation Workbook Key',
+            'workbook': 'Workbook',
+            'unit00': 'Unit 00',
+        }
         
-        # Remove padroes comuns
-        patterns_to_remove = [
-            r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]',  # Remove tudo antes de STUDENT BOOK/TEACHER BOOK
-            r'[-_](TEACHER|STUDENT|WORKBOOK)$',  # Remove sufixos
-            r'^[A-Z0-9-]+[-_]',  # Remove prefixo do curso
-        ]
+        filename_lower = filename.lower()
+        for key, value in special_names.items():
+            if key in filename_lower:
+                display_name = value
+                break
         
-        for pattern in patterns_to_remove:
-            name_clean = re.sub(pattern, '', name_clean, flags=re.IGNORECASE)
-        
-        # Remove numeros iniciais (Unit00, etc)
-        name_clean = re.sub(r'^(Unit|Module|Mod)\d+[-_]?', '', name_clean, flags=re.IGNORECASE)
-        
-        # Se ficou vazio ou muito curto, usa o filename original limpo
-        if not name_clean or len(name_clean) < 3:
-            name_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', filename, flags=re.IGNORECASE)
-            name_clean = re.sub(r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]', '', name_clean, flags=re.IGNORECASE)
-        
-        # Formata bonito
-        display_name = name_clean.replace("_", " ").replace("-", " ").title()
-        
-        # Casos especiais
-        if "GrammarReference" in filename or "Grammar Reference" in display_name:
-            display_name = "Grammar Reference"
-        elif "CheckpointKey" in filename or "Checkpoint Key" in display_name:
-            display_name = "Checkpoint Key"
-        elif "AnswerKey" in filename or "Answer Key" in display_name:
-            display_name = "Answer Key"
+        # 3. Se não achou padrão especial, extrai o que sobra
+        if not display_name:
+            # Remove TUDO que é ruído
+            name_clean = filename
+            
+            # Remove nome do curso no início
+            name_clean = re.sub(r'^[A-Z0-9]+[-_]', '', name_clean)
+            
+            # Remove STUDENT BOOK / TEACHER BOOK / WORKBOOK
+            name_clean = re.sub(r'[-_](STUDENT|TEACHER)[-_]?BOOK[-_]', ' ', name_clean, flags=re.IGNORECASE)
+            name_clean = re.sub(r'[-_](STUDENT|TEACHER|WORKBOOK)[-_]', ' ', name_clean, flags=re.IGNORECASE)
+            
+            # Remove sufixos teacher/student/workbook
+            name_clean = re.sub(r'[-_](teacher|student|workbook)$', '', name_clean, flags=re.IGNORECASE)
+            
+            # Remove Unit00, Unit01, etc se não tiver número capturado
+            if not unit_num:
+                name_clean = re.sub(r'Unit\d+', '', name_clean, flags=re.IGNORECASE)
+            
+            # Limpa espaços múltiplos e hífens
+            name_clean = re.sub(r'[-_]+', ' ', name_clean)
+            name_clean = re.sub(r'\s+', ' ', name_clean).strip()
+            
+            # Formata bonito
+            display_name = name_clean.title() if name_clean else filename.replace("_", " ").replace("-", " ").title()
     
-    # Grupo e ordenacao
+    # ==========================================
+    # GRUPO E ORDENAÇÃO
+    # ==========================================
     if checkpoint_num:
         sort_key = (0, 0, checkpoint_num)
         group_name = "Checkpoints"
