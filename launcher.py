@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-AQUI E O DED, SOMENTE O LAUNCHER SAI DAQUI VLEHO 
+ISSO SO DA PROBLEMA NAO MEXE RAPAZEADA 
+
+DED FORA POR UM MOMENTO...
+
 """
-import os, sys, time, socket, subprocess, threading, json
+import os, sys, time, socket, subprocess, threading, json, re
 from datetime import datetime, timedelta
 import http.server, socketserver
 from urllib.request import urlopen, Request
@@ -23,7 +26,6 @@ PDFS = "pdfs_found.txt"
 REPO_API = "https://api.github.com/repos/dedneves/Stemplay/commits?per_page=1"
 SHA_FILE = os.path.join(DIRETORIO, ".last_commit")
 TEMPO_ATIVO = 60
-LARGURA = 60  # largura fixa pra padding
 
 CORES = ["\033[91m", "\033[92m", "\033[93m", "\033[94m",
          "\033[95m", "\033[96m", "\033[97m"]
@@ -42,6 +44,7 @@ LETRAS = {
     'S': ["███████╗", "██╔════╝", "███████╗", "╚════██║", "███████║", "╚══════╝"],
     ' ': ["   ", "   ", "   ", "   ", "   ", "   "],
 }
+
 
 class RastreadorVisitantes:
     def __init__(self):
@@ -72,7 +75,9 @@ class RastreadorVisitantes:
                 if agora - dados['ultimo'] < limite
             }
 
+
 rastreador = RastreadorVisitantes()
+
 
 def ascii_art(texto):
     linhas = [""] * 6
@@ -81,16 +86,10 @@ def ascii_art(texto):
             linhas[i] += LETRAS.get(ch, LETRAS[' '])[i]
     return linhas
 
+
 def limpar():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def pad(linha, largura=LARGURA):
-    """Adiciona espacos ate completar a largura (pra sobrescrever texto antigo)"""
-    # Remove codigos ANSI pra contar tamanho real
-    import re
-    texto_limpo = re.sub(r'\033\[[0-9;]*m', '', linha)
-    faltam = max(0, largura - len(texto_limpo))
-    return linha + ' ' * faltam
 
 def banner_piscante():
     import random
@@ -118,6 +117,7 @@ def banner_piscante():
     print("    " + "─" * 44)
     print()
 
+
 def banner_estatico():
     print()
     art = ascii_art("DEDNEVES")
@@ -127,6 +127,7 @@ def banner_estatico():
     print("    StemPlay Library  ·  Servidor Local")
     print("    " + "─" * 44)
     print()
+
 
 def checar_updates():
     print("    [CHECK] Verificando atualizacoes do repositorio...")
@@ -178,6 +179,7 @@ def checar_updates():
     else:
         print(f"    [ OK ] Versao atualizada (commit {sha_remoto[:8]})")
 
+
 def baixar_atualizacao():
     print()
     print("    [DL] Baixando arquivos atualizados...")
@@ -206,6 +208,7 @@ def baixar_atualizacao():
     input("    Pressione Enter para sair...")
     sys.exit(0)
 
+
 def spinner(mensagem, parar_event):
     frames = ['|', '/', '-', '\\']
     i = 0
@@ -216,6 +219,7 @@ def spinner(mensagem, parar_event):
         time.sleep(0.1)
     sys.stdout.write('\r' + ' ' * (len(mensagem) + 10) + '\r')
     sys.stdout.flush()
+
 
 def rodar_script(script, mensagem):
     proc = subprocess.Popen(
@@ -237,6 +241,7 @@ def rodar_script(script, mensagem):
         print("    " + stderr.decode('utf-8', errors='replace').replace('\n', '\n    '))
         return False
 
+
 def encontrar_porta_livre(preferida):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -250,6 +255,7 @@ def encontrar_porta_livre(preferida):
         porta = s2.getsockname()[1]
         s2.close()
         return porta
+
 
 def criar_handler(diretorio):
     class Handler(http.server.SimpleHTTPRequestHandler):
@@ -266,8 +272,10 @@ def criar_handler(diretorio):
             super().do_GET()
     return Handler
 
+
 class ServidorHTTP(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
+
 
 def rodar_servidor(porta, event_parar):
     handler = criar_handler(DIRETORIO)
@@ -277,6 +285,7 @@ def rodar_servidor(porta, event_parar):
                 httpd.handle_request()
     except OSError as e:
         print(f"\n    [ERRO] Porta {porta}: {e}")
+
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -288,6 +297,7 @@ def get_ip():
     finally:
         s.close()
 
+
 def mostrar_qr(url):
     try:
         import qrcode
@@ -298,58 +308,71 @@ def mostrar_qr(url):
         print("    [AVISO] Instale 'qrcode':  pip install qrcode")
         print(f"    Ou acesse: {url}")
 
+
 def gerar_linhas_visitantes():
-    """Gera lista de strings com padding fixo"""
+    """Gera lista de strings da secao de visitantes"""
     ativos = rastreador.ativos()
     linhas = []
-    linhas.append(pad("    " + "─" * 44))
-    linhas.append(pad(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}"))
-    linhas.append(pad("    " + "─" * 44))
+    linhas.append("    " + "─" * 44)
+    linhas.append(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}")
+    linhas.append("    " + "─" * 44)
 
     if not ativos:
-        linhas.append(pad(f"    {DIM}(ninguem conectado no momento){RESET}"))
+        linhas.append(f"    {DIM}(ninguem conectado no momento){RESET}")
     else:
         for ip, dados in sorted(ativos.items(), key=lambda x: x[1]['ultimo'], reverse=True):
             tempo_atras = int((datetime.now() - dados['ultimo']).total_seconds())
             status = "agora" if tempo_atras < 5 else f"{tempo_atras}s atras"
             origem = "LOCAL" if ip.startswith("127.") or ip == "localhost" else "REDE "
-            linhas.append(pad(f"    {VERDE}*{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}"))
+            linhas.append(f"    {VERDE}*{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}")
 
-    linhas.append(pad(""))
-    linhas.append(pad(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}"))
-    linhas.append(pad(""))
-    linhas.append(pad("    Pressione Ctrl+C para encerrar."))
-    linhas.append(pad(""))
+    linhas.append("")
+    linhas.append(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
+    linhas.append("")
+    linhas.append("    Pressione Ctrl+C para encerrar.")
+    linhas.append("")
     return linhas
 
-# Tamanho MAXIMO de linhas que ja imprimimos (pra saber quantas subir)
-MAX_LINHAS_VISITANTES = 20
 
 def loop_visitantes(event_parar):
-    """Atualiza visitantes subindo N linhas fixas e reescrevendo com padding"""
+    """Atualiza visitantes usando contagem EXATA de linhas"""
+    ultimo_total = 0
+    max_len_anterior = 0
+
     while not event_parar.is_set():
         time.sleep(3)
         if event_parar.is_set():
             break
 
-        # Sobe MAX_LINHAS_VISITANTES linhas
-        sys.stdout.write(f"\033[{MAX_LINHAS_VISITANTES}A")
-        sys.stdout.flush()
+        # Sobe exatamente o numero de linhas da ultima impressao
+        if ultimo_total > 0:
+            sys.stdout.write(f"\033[{ultimo_total}A")
+            sys.stdout.flush()
 
-        # Reescreve todas as linhas com padding (sobrescreve texto antigo)
+        # Gera novas linhas
         linhas = gerar_linhas_visitantes()
+
+        # Imprime cada linha com padding pra sobrescrever texto antigo
         for linha in linhas:
-            print(linha)
+            texto_limpo = re.sub(r'\033\[[0-9;]*m', '', linha)
+            faltam = max(0, max_len_anterior - len(texto_limpo))
+            print(linha + ' ' * faltam)
 
-        # Se gerou menos linhas que o maximo, preenche com linhas vazias
-        for _ in range(MAX_LINHAS_VISITANTES - len(linhas)):
-            print(' ' * LARGURA)
+        # Se agora tem MENOS linhas que antes, apaga as linhas extras
+        if len(linhas) < ultimo_total:
+            diferenca = ultimo_total - len(linhas)
+            for _ in range(diferenca):
+                print(' ' * max_len_anterior)
+            # Volta cursor pras linhas extras que limpamos
+            sys.stdout.write(f"\033[{diferenca}A")
+            sys.stdout.flush()
 
-        # Volta o cursor pra posicao correta (sobe o excesso de linhas preenchidas)
-        excesso = MAX_LINHAS_VISITANTES - len(linhas)
-        if excesso > 0:
-            sys.stdout.write(f"\033[{excesso}A")
-        sys.stdout.flush()
+        # Salva o total de linhas e comprimento maximo desta impressao
+        ultimo_total = len(linhas)
+        max_len_anterior = max(
+            len(re.sub(r'\033\[[0-9;]*m', '', l)) for l in linhas
+        ) if linhas else 0
+
 
 def main():
     os.chdir(DIRETORIO)
@@ -409,18 +432,10 @@ def main():
     mostrar_qr(url_rede)
     print()
 
-    # Imprime bloco inicial com padding
+    # Imprime bloco inicial de visitantes
     linhas_iniciais = gerar_linhas_visitantes()
     for linha in linhas_iniciais:
         print(linha)
-    # Preenche ate MAX_LINHAS_VISITANTES
-    for _ in range(MAX_LINHAS_VISITANTES - len(linhas_iniciais)):
-        print(' ' * LARGURA)
-    # Volta cursor pro final do bloco
-    excesso = MAX_LINHAS_VISITANTES - len(linhas_iniciais)
-    if excesso > 0:
-        sys.stdout.write(f"\033[{excesso}A")
-    sys.stdout.flush()
 
     # Inicia thread de atualizacao
     t_visitantes = threading.Thread(target=loop_visitantes, args=(parar_event,), daemon=True)
@@ -434,6 +449,7 @@ def main():
         parar_event.set()
         time.sleep(0.3)
         print("    Ate logo!\n")
+
 
 if __name__ == "__main__":
     main()
