@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-ISSO SO DA PROBLEMA NAO MEXE RAPAZEADA 
+TA LENDO, EU SEI 
 
-DED FORA POR UM MOMENTO...
-
+QUEM SE MEXER E GAY
 """
 import os, sys, time, socket, subprocess, threading, json, re
 from datetime import datetime, timedelta
@@ -11,12 +10,18 @@ import http.server, socketserver
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
+# Forca UTF-8 no Windows
 if sys.platform == 'win32':
     os.system('')
     try:
         sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
         pass
+
+# Silencia warnings do urllib
+import logging
+logging.getLogger('urllib3').setLevel(logging.ERROR)
 
 PORTA_LOCAL_PREF = 8000
 PORTA_REDE_PREF = 8081
@@ -91,6 +96,11 @@ def limpar():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
+def tamanho_visivel(texto):
+    """Conta caracteres visiveis ignorando codigos ANSI"""
+    return len(re.sub(r'\033\[[0-9;]*m', '', texto))
+
+
 def banner_piscante():
     import random
     art = ascii_art("DEDNEVES")
@@ -99,38 +109,40 @@ def banner_piscante():
     frames = int(duracao / intervalo)
 
     limpar()
-    print()
+    sys.stdout.write("\n")
     for i in range(frames):
         cor = random.choice(CORES)
-        print("\033[6A", end="")
+        sys.stdout.write("\033[6A")
         for linha in art:
-            print("    " + cor + BOLD + linha + RESET)
+            sys.stdout.write("    " + cor + BOLD + linha + RESET + "\n")
         sys.stdout.flush()
         time.sleep(intervalo)
 
-    print("\033[6A", end="")
+    sys.stdout.write("\033[6A")
     for linha in art:
-        print("    " + VERDE + BOLD + linha + RESET)
+        sys.stdout.write("    " + VERDE + BOLD + linha + RESET + "\n")
 
-    print()
-    print("    StemPlay Library  ·  Servidor Local")
-    print("    " + "─" * 44)
-    print()
+    sys.stdout.write("\n")
+    sys.stdout.write("    StemPlay Library  ·  Servidor Local\n")
+    sys.stdout.write("    " + "─" * 44 + "\n")
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 
 def banner_estatico():
-    print()
     art = ascii_art("DEDNEVES")
     for linha in art:
-        print("    " + VERDE + BOLD + linha + RESET)
-    print()
-    print("    StemPlay Library  ·  Servidor Local")
-    print("    " + "─" * 44)
-    print()
+        sys.stdout.write("    " + VERDE + BOLD + linha + RESET + "\n")
+    sys.stdout.write("\n")
+    sys.stdout.write("    StemPlay Library  ·  Servidor Local\n")
+    sys.stdout.write("    " + "─" * 44 + "\n")
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 
 def checar_updates():
-    print("    [CHECK] Verificando atualizacoes do repositorio...")
+    sys.stdout.write("    [CHECK] Verificando atualizacoes do repositorio...\n")
+    sys.stdout.flush()
 
     sha_local = None
     if os.path.exists(SHA_FILE):
@@ -145,13 +157,15 @@ def checar_updates():
         with urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode())
             if not data:
-                print("    [INFO] Repositorio vazio ou sem commits")
+                sys.stdout.write("    [INFO] Repositorio vazio ou sem commits\n")
+                sys.stdout.flush()
                 return
             sha_remoto = data[0]["sha"]
             mensagem = data[0]["commit"]["message"].split("\n")[0][:60]
             data_commit = data[0]["commit"]["author"]["date"][:10]
     except (URLError, json.JSONDecodeError, KeyError, OSError):
-        print("    [INFO] Sem internet ou repo indisponivel - modo offline")
+        sys.stdout.write("    [INFO] Sem internet ou repo indisponivel - modo offline\n")
+        sys.stdout.flush()
         return
 
     try:
@@ -161,14 +175,15 @@ def checar_updates():
         pass
 
     if sha_local is None:
-        print(f"    [INFO] Primeira checagem. Commit: {sha_remoto[:8]} ({data_commit})")
-        print(f"    [INFO] \"{mensagem}\"")
+        sys.stdout.write(f"    [INFO] Primeira checagem. Commit: {sha_remoto[:8]} ({data_commit})\n")
+        sys.stdout.write(f"    [INFO] \"{mensagem}\"\n")
     elif sha_local != sha_remoto:
-        print(f"    [UPDATE] Nova versao disponivel!")
-        print(f"    [UPDATE] Commit: {sha_remoto[:8]} ({data_commit})")
-        print(f"    [UPDATE] \"{mensagem}\"")
-        print()
-        print("    Deseja baixar a nova versao? (s/N): ", end="", flush=True)
+        sys.stdout.write(f"    [UPDATE] Nova versao disponivel!\n")
+        sys.stdout.write(f"    [UPDATE] Commit: {sha_remoto[:8]} ({data_commit})\n")
+        sys.stdout.write(f"    [UPDATE] \"{mensagem}\"\n")
+        sys.stdout.write("\n")
+        sys.stdout.write("    Deseja baixar a nova versao? (s/N): ", )
+        sys.stdout.flush()
         try:
             resp = input().strip().lower()
         except EOFError:
@@ -177,12 +192,14 @@ def checar_updates():
         if resp in ('s', 'sim', 'y', 'yes'):
             baixar_atualizacao()
     else:
-        print(f"    [ OK ] Versao atualizada (commit {sha_remoto[:8]})")
+        sys.stdout.write(f"    [ OK ] Versao atualizada (commit {sha_remoto[:8]})\n")
+    sys.stdout.flush()
 
 
 def baixar_atualizacao():
-    print()
-    print("    [DL] Baixando arquivos atualizados...")
+    sys.stdout.write("\n")
+    sys.stdout.write("    [DL] Baixando arquivos atualizados...\n")
+    sys.stdout.flush()
     arquivos = [
         ("launcher.py", "https://raw.githubusercontent.com/dedneves/Stemplay/main/launcher.py"),
         ("s3_god_mode.py", "https://raw.githubusercontent.com/dedneves/Stemplay/main/s3_god_mode.py"),
@@ -199,12 +216,14 @@ def baixar_atualizacao():
             caminho = os.path.join(DIRETORIO, nome)
             with open(caminho, "wb") as f:
                 f.write(conteudo)
-            print(f"    [ OK ] {nome}")
+            sys.stdout.write(f"    [ OK ] {nome}\n")
         except Exception as e:
-            print(f"    [ERRO] {nome}: {e}")
+            sys.stdout.write(f"    [ERRO] {nome}: {e}\n")
+        sys.stdout.flush()
 
-    print()
-    print("    [INFO] Atualizacao concluida. Reinicie o launcher.")
+    sys.stdout.write("\n")
+    sys.stdout.write("    [INFO] Atualizacao concluida. Reinicie o launcher.\n")
+    sys.stdout.flush()
     input("    Pressione Enter para sair...")
     sys.exit(0)
 
@@ -222,23 +241,38 @@ def spinner(mensagem, parar_event):
 
 
 def rodar_script(script, mensagem):
+    # Suprime completamente stdout/stderr do subprocesso
     proc = subprocess.Popen(
         [sys.executable, script],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=DIRETORIO
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=DIRETORIO
     )
     parar = threading.Event()
     sp = threading.Thread(target=spinner, args=(mensagem, parar), daemon=True)
     sp.start()
-    stdout, stderr = proc.communicate()
+    proc.communicate()
     parar.set()
     sp.join(timeout=1)
     if proc.returncode == 0:
-        print(f'\r    [ OK ] {mensagem}              ')
+        sys.stdout.write(f'\r    [ OK ] {mensagem}              \n')
+        sys.stdout.flush()
         return True
     else:
-        print(f'\r    [ERRO] {mensagem}              ')
-        print("\n    Detalhes:")
-        print("    " + stderr.decode('utf-8', errors='replace').replace('\n', '\n    '))
+        sys.stdout.write(f'\r    [ERRO] {mensagem}              \n')
+        sys.stdout.flush()
+        # Tenta rodar de novo mostrando erro
+        sys.stdout.write("    Rodando novamente para capturar erro...\n")
+        sys.stdout.flush()
+        proc2 = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, cwd=DIRETORIO
+        )
+        if proc2.stderr:
+            sys.stdout.write("\n    Detalhes:\n")
+            for linha in proc2.stderr.split('\n')[:10]:
+                sys.stdout.write("    " + linha + "\n")
+        sys.stdout.flush()
         return False
 
 
@@ -263,28 +297,33 @@ def criar_handler(diretorio):
             super().__init__(*args, directory=diretorio, **kwargs)
 
         def log_message(self, *args):
-            pass
+            pass  # Silencia logs HTTP
 
         def do_GET(self):
             ip = self.client_address[0]
             pagina = self.path.split('?')[0]
             rastreador.registrar(ip, pagina)
             super().do_GET()
+
+        def log_error(self, *args):
+            pass  # Silencia erros HTTP tambem
     return Handler
 
 
 class ServidorHTTP(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
 
 def rodar_servidor(porta, event_parar):
     handler = criar_handler(DIRETORIO)
     try:
         with ServidorHTTP(("0.0.0.0", porta), handler) as httpd:
+            httpd.timeout = 1
             while not event_parar.is_set():
                 httpd.handle_request()
-    except OSError as e:
-        print(f"\n    [ERRO] Porta {porta}: {e}")
+    except OSError:
+        pass
 
 
 def get_ip():
@@ -305,8 +344,9 @@ def mostrar_qr(url):
         qr.add_data(url)
         qr.print_ascii(invert=True)
     except ImportError:
-        print("    [AVISO] Instale 'qrcode':  pip install qrcode")
-        print(f"    Ou acesse: {url}")
+        sys.stdout.write("    [AVISO] Instale 'qrcode':  pip install qrcode\n")
+        sys.stdout.write(f"    Ou acesse: {url}\n")
+    sys.stdout.flush()
 
 
 def gerar_linhas_visitantes():
@@ -330,76 +370,94 @@ def gerar_linhas_visitantes():
     linhas.append(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
     linhas.append("")
     linhas.append("    Pressione Ctrl+C para encerrar.")
-    linhas.append("")
     return linhas
 
 
 def loop_visitantes(event_parar):
-    """Atualiza visitantes usando contagem EXATA de linhas"""
-    ultimo_total = 0
-    max_len_anterior = 0
+    """
+    Thread responsavel por TODA a exibicao de visitantes.
+    Faz a primeira impressao E todas as atualizacoes.
+    Nao usa print() - usa sys.stdout.write com controle total.
+    """
+    linhas_anteriores = 0
+    max_len = 0
+    primeira_vez = True
 
     while not event_parar.is_set():
-        time.sleep(3)
-        if event_parar.is_set():
-            break
+        # Espera 3s antes da proxima atualizacao
+        for _ in range(30):
+            if event_parar.is_set():
+                return
+            time.sleep(0.1)
 
-        # Sobe exatamente o numero de linhas da ultima impressao
-        if ultimo_total > 0:
-            sys.stdout.write(f"\033[{ultimo_total}A")
-            sys.stdout.flush()
+        if event_parar.is_set():
+            return
 
         # Gera novas linhas
-        linhas = gerar_linhas_visitantes()
+        novas_linhas = gerar_linhas_visitantes()
 
-        # Imprime cada linha com padding pra sobrescrever texto antigo
-        for linha in linhas:
-            texto_limpo = re.sub(r'\033\[[0-9;]*m', '', linha)
-            faltam = max(0, max_len_anterior - len(texto_limpo))
-            print(linha + ' ' * faltam)
+        # Se nao e a primeira vez, sobe o cursor
+        if not primeira_vez and linhas_anteriores > 0:
+            sys.stdout.write(f"\033[{linhas_anteriores}A")
 
-        # Se agora tem MENOS linhas que antes, apaga as linhas extras
-        if len(linhas) < ultimo_total:
-            diferenca = ultimo_total - len(linhas)
+        # Imprime cada linha com padding
+        for linha in novas_linhas:
+            tam = tamanho_visivel(linha)
+            faltam = max(0, max_len - tam)
+            sys.stdout.write(linha + ' ' * faltam + "\n")
+
+        # Se tem menos linhas que antes, apaga as extras
+        if len(novas_linhas) < linhas_anteriores:
+            diferenca = linhas_anteriores - len(novas_linhas)
             for _ in range(diferenca):
-                print(' ' * max_len_anterior)
-            # Volta cursor pras linhas extras que limpamos
+                sys.stdout.write(' ' * max_len + "\n")
+            # Volta cursor pras linhas extras
             sys.stdout.write(f"\033[{diferenca}A")
-            sys.stdout.flush()
 
-        # Salva o total de linhas e comprimento maximo desta impressao
-        ultimo_total = len(linhas)
-        max_len_anterior = max(
-            len(re.sub(r'\033\[[0-9;]*m', '', l)) for l in linhas
-        ) if linhas else 0
+        sys.stdout.flush()
+
+        # Atualiza contadores
+        linhas_anteriores = len(novas_linhas)
+        max_len = max(tamanho_visivel(l) for l in novas_linhas) if novas_linhas else 0
+        primeira_vez = False
 
 
 def main():
     os.chdir(DIRETORIO)
     limpar()
 
+    # Verifica updates
     checar_updates()
+
+    # Banner piscante
     banner_piscante()
 
+    # Gera PDFs se necessario
     if not os.path.exists(PDFS):
-        print("    Primeira execucao: gerando lista de PDFs...")
+        sys.stdout.write("    Primeira execucao: gerando lista de PDFs...\n")
+        sys.stdout.flush()
         if not rodar_script("s3_god_mode.py", "Gerando lista de PDFs"):
             input("\n    Pressione Enter para sair...")
             sys.exit(1)
     else:
-        print("    [ OK ] Lista de PDFs encontrada")
+        sys.stdout.write("    [ OK ] Lista de PDFs encontrada\n")
+        sys.stdout.flush()
 
+    # Gera HTML se necessario
     if not os.path.exists(HTML):
         if not rodar_script("generate_library_premium.py", "Gerando biblioteca HTML"):
             input("\n    Pressione Enter para sair...")
             sys.exit(1)
     else:
-        print("    [ OK ] Biblioteca HTML encontrada")
+        sys.stdout.write("    [ OK ] Biblioteca HTML encontrada\n")
+        sys.stdout.flush()
 
-    print()
-    print("    Subindo servidores...")
+    sys.stdout.write("\n")
+    sys.stdout.write("    Subindo servidores...\n")
+    sys.stdout.flush()
     time.sleep(0.5)
 
+    # Encontra portas
     porta_local = encontrar_porta_livre(PORTA_LOCAL_PREF)
     porta_rede = encontrar_porta_livre(PORTA_REDE_PREF)
 
@@ -407,6 +465,7 @@ def main():
     url_local = f"http://localhost:{porta_local}/{HTML}"
     url_rede = f"http://{ip}:{porta_rede}/{HTML}"
 
+    # Inicia servidores
     parar_event = threading.Event()
     t_local = threading.Thread(target=rodar_servidor, args=(porta_local, parar_event), daemon=True)
     t_rede = threading.Thread(target=rodar_servidor, args=(porta_rede, parar_event), daemon=True)
@@ -414,41 +473,42 @@ def main():
     t_rede.start()
     time.sleep(0.5)
 
+    # Limpa e redesenha tudo
     limpar()
     banner_estatico()
-    print("    Servidores no ar!")
-    print("    " + "─" * 44)
-    print(f"    Local  :  {url_local}")
-    print(f"    Rede   :  {url_rede}")
-    print(f"    Pasta  :  {DIRETORIO}")
+    sys.stdout.write("    Servidores no ar!\n")
+    sys.stdout.write("    " + "─" * 44 + "\n")
+    sys.stdout.write(f"    Local  :  {url_local}\n")
+    sys.stdout.write(f"    Rede   :  {url_rede}\n")
+    sys.stdout.write(f"    Pasta  :  {DIRETORIO}\n")
     if porta_local != PORTA_LOCAL_PREF:
-        print(f"    [INFO] Porta local ajustada: {porta_local}")
+        sys.stdout.write(f"    [INFO] Porta local ajustada: {porta_local}\n")
     if porta_rede != PORTA_REDE_PREF:
-        print(f"    [INFO] Porta rede ajustada: {porta_rede}")
-    print("    " + "─" * 44)
-    print()
-    print("    Escaneie o QR Code com o celular:")
-    print()
+        sys.stdout.write(f"    [INFO] Porta rede ajustada: {porta_rede}\n")
+    sys.stdout.write("    " + "─" * 44 + "\n")
+    sys.stdout.write("\n")
+    sys.stdout.write("    Escaneie o QR Code com o celular:\n")
+    sys.stdout.write("\n")
+    sys.stdout.flush()
     mostrar_qr(url_rede)
-    print()
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
-    # Imprime bloco inicial de visitantes
-    linhas_iniciais = gerar_linhas_visitantes()
-    for linha in linhas_iniciais:
-        print(linha)
-
-    # Inicia thread de atualizacao
+    # Inicia thread de visitantes (ela faz a primeira impressao tambem)
     t_visitantes = threading.Thread(target=loop_visitantes, args=(parar_event,), daemon=True)
     t_visitantes.start()
 
+    # Loop principal so fica vivo
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n    Encerrando servidores...")
+        sys.stdout.write("\n\n    Encerrando servidores...\n")
+        sys.stdout.flush()
         parar_event.set()
         time.sleep(0.3)
-        print("    Ate logo!\n")
+        sys.stdout.write("    Ate logo!\n")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
