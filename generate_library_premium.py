@@ -16,13 +16,12 @@ READER_BASE = "https://reader.stemplay.io/?file="
 USER_ID = "k3s"
 
 def parse_pdf_info(url):
-    """Parse melhorado com deteccao precisa de tipo e deduplicacao"""
+    """Parse melhorado com extracao inteligente de nomes"""
     filename = url.split("/")[-1].replace(".pdf", "")
     parts = url.split("/")
     
-    # Extrai nome do curso
+    # Extrai nome do curso (remove sufixos)
     course_raw = parts[4] if len(parts) > 4 else "OUTROS"
-    # Remove sufixos TEACHER/STUDENT do nome do curso
     course_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', course_raw, flags=re.IGNORECASE)
     course = course_clean.replace("-", " ").replace("_", " ").title()
     
@@ -32,7 +31,6 @@ def parse_pdf_info(url):
     is_student = "STUDENT" in filename_upper or "STUDENT-BOOK" in filename_upper
     is_workbook = "WORKBOOK" in filename_upper or "WORK-BOOK" in filename_upper
     
-    # Determina tipo (Teacher tem prioridade)
     if is_teacher:
         material_type = "Teacher"
     elif is_workbook:
@@ -46,25 +44,63 @@ def parse_pdf_info(url):
     lesson_match = re.search(r'(?:Aula|Lesson|Class)(\d+)', filename, re.IGNORECASE)
     unit_match = re.search(r'Unit(\d+)', filename)
     module_match = re.search(r'M(\d+)', filename)
+    checkpoint_match = re.search(r'Checkpoint(\d+)', filename, re.IGNORECASE)
     
     lesson_num = int(lesson_match.group(1)) if lesson_match else None
     unit_num = int(unit_match.group(1)) if unit_match else None
     module_num = int(module_match.group(1)) if module_match else None
+    checkpoint_num = int(checkpoint_match.group(1)) if checkpoint_match else None
     
-    # Nome de exibicao
+    # Nome de exibicao INTELIGENTE
+    display_name = None
+    
     if lesson_num:
         display_name = f"Aula {lesson_num:02d}"
     elif unit_num:
         display_name = f"Unidade {unit_num:02d}"
     elif module_num:
         display_name = f"Modulo {module_num}"
+    elif checkpoint_num:
+        display_name = f"Checkpoint {checkpoint_num:02d}"
     else:
-        # Limpa nome para display
-        name_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', filename, flags=re.IGNORECASE)
+        # Extrai nome especifico do arquivo
+        # Remove prefixos comuns e sufixos
+        name_clean = filename
+        
+        # Remove padroes comuns
+        patterns_to_remove = [
+            r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]',  # Remove tudo antes de STUDENT BOOK/TEACHER BOOK
+            r'[-_](TEACHER|STUDENT|WORKBOOK)$',  # Remove sufixos
+            r'^[A-Z0-9-]+[-_]',  # Remove prefixo do curso
+        ]
+        
+        for pattern in patterns_to_remove:
+            name_clean = re.sub(pattern, '', name_clean, flags=re.IGNORECASE)
+        
+        # Remove numeros iniciais (Unit00, etc)
+        name_clean = re.sub(r'^(Unit|Module|Mod)\d+[-_]?', '', name_clean, flags=re.IGNORECASE)
+        
+        # Se ficou vazio ou muito curto, usa o filename original limpo
+        if not name_clean or len(name_clean) < 3:
+            name_clean = re.sub(r'[-_](TEACHER|STUDENT|WORKBOOK)$', '', filename, flags=re.IGNORECASE)
+            name_clean = re.sub(r'^.*?[-_](STUDENT[-_]?BOOK|TEACHER[-_]?BOOK|WORKBOOK)[-_]', '', name_clean, flags=re.IGNORECASE)
+        
+        # Formata bonito
         display_name = name_clean.replace("_", " ").replace("-", " ").title()
+        
+        # Casos especiais
+        if "GrammarReference" in filename or "Grammar Reference" in display_name:
+            display_name = "Grammar Reference"
+        elif "CheckpointKey" in filename or "Checkpoint Key" in display_name:
+            display_name = "Checkpoint Key"
+        elif "AnswerKey" in filename or "Answer Key" in display_name:
+            display_name = "Answer Key"
     
     # Grupo e ordenacao
-    if module_num and lesson_num:
+    if checkpoint_num:
+        sort_key = (0, 0, checkpoint_num)
+        group_name = "Checkpoints"
+    elif module_num and lesson_num:
         sort_key = (module_num, lesson_num, 0)
         group_name = f"Modulo {module_num}"
     elif unit_num:
@@ -83,6 +119,7 @@ def parse_pdf_info(url):
         "lesson_num": lesson_num,
         "unit_num": unit_num,
         "module_num": module_num,
+        "checkpoint_num": checkpoint_num,
         "sort_key": sort_key,
         "group_name": group_name
     }
