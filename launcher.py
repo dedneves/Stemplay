@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AQUI E O DED E SO LAUNCHER NAO TEM NADA
+AQUI E O DED, SOMENTE O LAUNCHER SAI DAQUI VLEHO 
 """
 import os, sys, time, socket, subprocess, threading, json
 from datetime import datetime, timedelta
@@ -23,6 +23,7 @@ PDFS = "pdfs_found.txt"
 REPO_API = "https://api.github.com/repos/dedneves/Stemplay/commits?per_page=1"
 SHA_FILE = os.path.join(DIRETORIO, ".last_commit")
 TEMPO_ATIVO = 60
+LARGURA = 60  # largura fixa pra padding
 
 CORES = ["\033[91m", "\033[92m", "\033[93m", "\033[94m",
          "\033[95m", "\033[96m", "\033[97m"]
@@ -49,7 +50,6 @@ class RastreadorVisitantes:
         self.total_visitas = 0
 
     def registrar(self, ip, pagina):
-        # Ignora requests chatos
         if pagina in ('/favicon.ico', '/robots.txt'):
             return
         with self.lock:
@@ -72,9 +72,6 @@ class RastreadorVisitantes:
                 if agora - dados['ultimo'] < limite
             }
 
-    def contar_ativos(self):
-        return len(self.ativos())
-
 rastreador = RastreadorVisitantes()
 
 def ascii_art(texto):
@@ -86,6 +83,14 @@ def ascii_art(texto):
 
 def limpar():
     os.system('cls' if os.name == 'nt' else 'clear')
+
+def pad(linha, largura=LARGURA):
+    """Adiciona espacos ate completar a largura (pra sobrescrever texto antigo)"""
+    # Remove codigos ANSI pra contar tamanho real
+    import re
+    texto_limpo = re.sub(r'\033\[[0-9;]*m', '', linha)
+    faltam = max(0, largura - len(texto_limpo))
+    return linha + ' ' * faltam
 
 def banner_piscante():
     import random
@@ -293,60 +298,58 @@ def mostrar_qr(url):
         print("    [AVISO] Instale 'qrcode':  pip install qrcode")
         print(f"    Ou acesse: {url}")
 
-def gerar_bloco_visitantes():
-    """Gera linhas da seção de visitantes (sem imprimir ainda)"""
+def gerar_linhas_visitantes():
+    """Gera lista de strings com padding fixo"""
     ativos = rastreador.ativos()
     linhas = []
-    linhas.append("    " + "─" * 44)
-    linhas.append(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}")
-    linhas.append("    " + "─" * 44)
+    linhas.append(pad("    " + "─" * 44))
+    linhas.append(pad(f"    {CIANO}{BOLD}Visitantes conectados: {len(ativos)}{RESET}"))
+    linhas.append(pad("    " + "─" * 44))
 
     if not ativos:
-        linhas.append(f"    {DIM}(ninguem conectado no momento){RESET}")
+        linhas.append(pad(f"    {DIM}(ninguem conectado no momento){RESET}"))
     else:
         for ip, dados in sorted(ativos.items(), key=lambda x: x[1]['ultimo'], reverse=True):
             tempo_atras = int((datetime.now() - dados['ultimo']).total_seconds())
-            if tempo_atras < 5:
-                status = "agora"
-            else:
-                status = f"{tempo_atras}s atras"
+            status = "agora" if tempo_atras < 5 else f"{tempo_atras}s atras"
+            origem = "LOCAL" if ip.startswith("127.") or ip == "localhost" else "REDE "
+            linhas.append(pad(f"    {VERDE}*{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}"))
 
-            if ip.startswith("127.") or ip == "localhost":
-                origem = "LOCAL"
-            else:
-                origem = "REDE "
-
-            linhas.append(f"    {VERDE}●{RESET} {ip:<15} {AMARELO}[{origem}]{RESET} {DIM}{status:<10}{RESET} {DIM}{dados['pagina'][:20]}{RESET}")
-
-    linhas.append("")
-    linhas.append(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}")
+    linhas.append(pad(""))
+    linhas.append(pad(f"    {DIM}Total de visitas: {rastreador.total_visitas}{RESET}"))
+    linhas.append(pad(""))
+    linhas.append(pad("    Pressione Ctrl+C para encerrar."))
+    linhas.append(pad(""))
     return linhas
 
-def loop_visitantes(event_parar, estado):
-    """Loop que atualiza visitantes usando ANSI 'Erase in Display' corretamente"""
-    ultimo_total_linhas = 0
+# Tamanho MAXIMO de linhas que ja imprimimos (pra saber quantas subir)
+MAX_LINHAS_VISITANTES = 20
 
+def loop_visitantes(event_parar):
+    """Atualiza visitantes subindo N linhas fixas e reescrevendo com padding"""
     while not event_parar.is_set():
         time.sleep(3)
         if event_parar.is_set():
             break
 
-        # Apaga as linhas antigas: move cursor pra cima e apaga cada linha
-        if ultimo_total_linhas > 0:
-            sys.stdout.write(f"\033[{ultimo_total_linhas}A")  # sobe N linhas
-            sys.stdout.write("\033[J")  # apaga do cursor até o fim da tela
-            sys.stdout.flush()
+        # Sobe MAX_LINHAS_VISITANTES linhas
+        sys.stdout.write(f"\033[{MAX_LINHAS_VISITANTES}A")
+        sys.stdout.flush()
 
-        # Gera e imprime novo bloco
-        linhas = gerar_bloco_visitantes()
+        # Reescreve todas as linhas com padding (sobrescreve texto antigo)
+        linhas = gerar_linhas_visitantes()
         for linha in linhas:
             print(linha)
-        print()
-        print("    Pressione Ctrl+C para encerrar.")
-        print()
 
-        # Guarda o total de linhas impressas (incluindo os prints extras)
-        ultimo_total_linhas = len(linhas) + 2  # +2 pelos prints vazios
+        # Se gerou menos linhas que o maximo, preenche com linhas vazias
+        for _ in range(MAX_LINHAS_VISITANTES - len(linhas)):
+            print(' ' * LARGURA)
+
+        # Volta o cursor pra posicao correta (sobe o excesso de linhas preenchidas)
+        excesso = MAX_LINHAS_VISITANTES - len(linhas)
+        if excesso > 0:
+            sys.stdout.write(f"\033[{excesso}A")
+        sys.stdout.flush()
 
 def main():
     os.chdir(DIRETORIO)
@@ -406,15 +409,21 @@ def main():
     mostrar_qr(url_rede)
     print()
 
-    # Imprime bloco inicial de visitantes
-    for linha in gerar_bloco_visitantes():
+    # Imprime bloco inicial com padding
+    linhas_iniciais = gerar_linhas_visitantes()
+    for linha in linhas_iniciais:
         print(linha)
-    print()
-    print("    Pressione Ctrl+C para encerrar.")
-    print()
+    # Preenche ate MAX_LINHAS_VISITANTES
+    for _ in range(MAX_LINHAS_VISITANTES - len(linhas_iniciais)):
+        print(' ' * LARGURA)
+    # Volta cursor pro final do bloco
+    excesso = MAX_LINHAS_VISITANTES - len(linhas_iniciais)
+    if excesso > 0:
+        sys.stdout.write(f"\033[{excesso}A")
+    sys.stdout.flush()
 
-    # Inicia thread de atualização
-    t_visitantes = threading.Thread(target=loop_visitantes, args=(parar_event, None), daemon=True)
+    # Inicia thread de atualizacao
+    t_visitantes = threading.Thread(target=loop_visitantes, args=(parar_event,), daemon=True)
     t_visitantes.start()
 
     try:
